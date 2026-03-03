@@ -45,8 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const taskHUD = new TaskHUD(game);
     game.taskHUD = taskHUD;
 
-    // Position player in entryway (center 0,-40)
+    // Position player in entryway (center 0,-40), facing north into the facility
     game.player.position.set(0, 1.7, -40);
+    game.player.yaw.rotation.y = Math.PI;
 
     game.start();
 

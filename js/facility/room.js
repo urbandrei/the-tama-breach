@@ -5,14 +5,26 @@ import { WALL_THICKNESS, DOOR_WIDTH, DOOR_HEIGHT } from './layout-data.js';
 const floorMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.92 });
 const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.9 });
 const wallMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.85 });
+const glassWallMat = new THREE.MeshStandardMaterial({
+  color: 0x88ccff,
+  transparent: true,
+  opacity: 0.25,
+  side: THREE.DoubleSide,
+  roughness: 0.1,
+  metalness: 0.2,
+  depthWrite: false,
+});
 
 export class Room {
-  constructor(roomData, doorways) {
+  constructor(roomData, doorways, options = {}) {
     this.id = roomData.id;
     this.data = roomData;
     this.group = new THREE.Group();
     this.group.name = `room_${this.id}`;
     this.colliders = [];
+    this.glassPanels = [];
+
+    this._glassWall = options.glassWall || null;
 
     const [cx, cz] = roomData.center;
     const [w, d] = roomData.size;
@@ -67,7 +79,7 @@ export class Room {
       const sideDoorways = doorways.filter(dw => dw.wallSide === wd.side);
 
       if (sideDoorways.length === 0) {
-        // Solid wall - no doorways
+        // Solid wall (or glass wall) - no doorways
         this._addSolidWall(wd, h);
       } else {
         // Wall with doorway cutouts
@@ -79,17 +91,24 @@ export class Room {
   }
 
   _addSolidWall(wd, h) {
+    const isGlass = this._glassWall === wd.side;
+    const mat = isGlass ? glassWallMat : wallMat;
+
     // Visual wall
     const wall = new THREE.Mesh(
       new THREE.PlaneGeometry(wd.length, h),
-      wallMat
+      mat
     );
     wall.position.set(...wd.pos);
     wall.rotation.y = wd.rotY;
-    wall.receiveShadow = true;
+    if (!isGlass) wall.receiveShadow = true;
     this.group.add(wall);
 
-    // Collider
+    if (isGlass) {
+      this.glassPanels.push(wall);
+    }
+
+    // Collider (always solid — blocks player even through glass)
     const isXWall = wd.along === 'x';
     const collider = new THREE.Mesh(
       new THREE.BoxGeometry(

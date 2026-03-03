@@ -12,6 +12,7 @@ const glassMat = new THREE.MeshStandardMaterial({
   side: THREE.DoubleSide,
   roughness: 0.1,
   metalness: 0.2,
+  depthWrite: false,
 });
 const pipeMat = new THREE.MeshStandardMaterial({ color: 0x556666, roughness: 0.5, metalness: 0.5 });
 const screenMat = new THREE.MeshStandardMaterial({ color: 0x112244, emissive: 0x0a1a3a, emissiveIntensity: 0.5 });
@@ -94,80 +95,144 @@ export function createShelf(x, z, rotation = 0) {
   return makeResult(g, [collider]);
 }
 
-// --- CONTAINMENT CHAMBER ---
-export function createContainmentChamber(x, z) {
+// --- HABITAT EXTENSION (containment room enclosure beyond glass wall) ---
+// extensionSide: 'north' or 'south' — which direction the habitat extends from the room
+const habitatWallMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.85 });
+const habitatFloorMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.92 });
+
+export function createHabitat(cx, cz, roomW, roomD, ceilingH, extensionSide, extensionD) {
   const g = new THREE.Group();
-  g.position.set(x, 0, z);
-  g.name = 'containment_chamber';
+  g.name = 'containment_habitat';
 
-  const chamberW = 2.0;
-  const chamberD = 2.0;
-  const chamberH = 2.5;
-  const postSize = 0.08;
+  const halfRoomD = roomD / 2;
+  const halfW = roomW / 2;
+  const halfExtD = extensionD / 2;
 
-  // 4 metal frame posts
-  const postGeo = new THREE.BoxGeometry(postSize, chamberH, postSize);
-  const hw = chamberW / 2 - postSize / 2;
-  const hd = chamberD / 2 - postSize / 2;
-  const postPositions = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
+  // Habitat position: extends beyond the room's back wall
+  const zSign = extensionSide === 'north' ? 1 : -1;
+  const roomEdgeZ = cz + zSign * halfRoomD;          // where room wall was
+  const habitatCenterZ = roomEdgeZ + zSign * halfExtD; // center of habitat
+  const habitatFarZ = roomEdgeZ + zSign * extensionD;  // far wall
 
-  for (const [px, pz] of postPositions) {
-    const post = new THREE.Mesh(postGeo, metalMat);
-    post.position.set(px, chamberH / 2, pz);
-    post.castShadow = true;
-    g.add(post);
-  }
+  g.position.set(cx, 0, habitatCenterZ);
 
-  // Top frame bars
-  const barGeoX = new THREE.BoxGeometry(chamberW, postSize, postSize);
-  const barGeoZ = new THREE.BoxGeometry(postSize, postSize, chamberD);
-  for (const pz of [-hd, hd]) {
-    const bar = new THREE.Mesh(barGeoX, metalMat);
-    bar.position.set(0, chamberH, pz);
-    g.add(bar);
-  }
-  for (const px of [-hw, hw]) {
-    const bar = new THREE.Mesh(barGeoZ, metalMat);
-    bar.position.set(px, chamberH, 0);
-    g.add(bar);
-  }
-
-  // 4 glass panels
-  const glassH = chamberH - 0.3;
-  const panels = [
-    { geo: new THREE.PlaneGeometry(chamberW, glassH), pos: [0, glassH / 2 + 0.15, hd], rot: [0, Math.PI, 0] },
-    { geo: new THREE.PlaneGeometry(chamberW, glassH), pos: [0, glassH / 2 + 0.15, -hd], rot: [0, 0, 0] },
-    { geo: new THREE.PlaneGeometry(chamberD, glassH), pos: [hw, glassH / 2 + 0.15, 0], rot: [0, -Math.PI / 2, 0] },
-    { geo: new THREE.PlaneGeometry(chamberD, glassH), pos: [-hw, glassH / 2 + 0.15, 0], rot: [0, Math.PI / 2, 0] },
-  ];
-
-  for (const p of panels) {
-    const glass = new THREE.Mesh(p.geo, glassMat);
-    glass.position.set(...p.pos);
-    glass.rotation.set(...p.rot);
-    g.add(glass);
-  }
-
-  // Interior platform (raised floor)
-  const platform = new THREE.Mesh(
-    new THREE.BoxGeometry(chamberW - 0.2, 0.1, chamberD - 0.2),
-    darkMetalMat
+  // Floor
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(roomW, extensionD),
+    habitatFloorMat
   );
-  platform.position.y = 0.05;
-  platform.receiveShadow = true;
-  g.add(platform);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  g.add(floor);
 
-  // Collider for the whole base
-  const colliders = [];
-  for (const [px, pz] of postPositions) {
-    const pc = new THREE.Mesh(
-      new THREE.BoxGeometry(0.2, chamberH, 0.2),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    pc.position.set(px, chamberH / 2, pz);
-    g.add(pc);
-    colliders.push(pc);
-  }
+  // Floor collider
+  const floorCol = new THREE.Mesh(
+    new THREE.BoxGeometry(roomW, 0.1, extensionD),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  floorCol.position.y = -0.05;
+  g.add(floorCol);
+
+  // Ceiling
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(roomW, extensionD),
+    habitatFloorMat
+  );
+  ceiling.rotation.x = Math.PI / 2;
+  ceiling.position.y = ceilingH;
+  g.add(ceiling);
+
+  // Back wall (far end, opposite the glass)
+  const backWallRotY = extensionSide === 'north' ? Math.PI : 0;
+  const backWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(roomW, ceilingH),
+    habitatWallMat
+  );
+  backWall.position.set(0, ceilingH / 2, zSign * halfExtD);
+  backWall.rotation.y = backWallRotY;
+  backWall.receiveShadow = true;
+  g.add(backWall);
+
+  // Left wall (west side)
+  const leftWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(extensionD, ceilingH),
+    habitatWallMat
+  );
+  leftWall.position.set(-halfW, ceilingH / 2, 0);
+  leftWall.rotation.y = Math.PI / 2;
+  leftWall.receiveShadow = true;
+  g.add(leftWall);
+
+  // Right wall (east side)
+  const rightWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(extensionD, ceilingH),
+    habitatWallMat
+  );
+  rightWall.position.set(halfW, ceilingH / 2, 0);
+  rightWall.rotation.y = -Math.PI / 2;
+  rightWall.receiveShadow = true;
+  g.add(rightWall);
+
+  // Colliders for the 3 solid walls
+  const colliders = [floorCol];
+  const invisMat = new THREE.MeshBasicMaterial({ visible: false });
+  const wt = 0.3; // wall thickness for colliders
+
+  // Back wall collider
+  const backCol = new THREE.Mesh(
+    new THREE.BoxGeometry(roomW, ceilingH, wt),
+    invisMat
+  );
+  backCol.position.set(0, ceilingH / 2, zSign * halfExtD);
+  g.add(backCol);
+  colliders.push(backCol);
+
+  // Left wall collider
+  const leftCol = new THREE.Mesh(
+    new THREE.BoxGeometry(wt, ceilingH, extensionD),
+    invisMat
+  );
+  leftCol.position.set(-halfW, ceilingH / 2, 0);
+  g.add(leftCol);
+  colliders.push(leftCol);
+
+  // Right wall collider
+  const rightCol = new THREE.Mesh(
+    new THREE.BoxGeometry(wt, ceilingH, extensionD),
+    invisMat
+  );
+  rightCol.position.set(halfW, ceilingH / 2, 0);
+  g.add(rightCol);
+  colliders.push(rightCol);
+
+  // Decoration waypoints (world coordinates — inside the habitat)
+  const margin = 1.0;
+  const innerMinX = cx - halfW + margin;
+  const innerMaxX = cx + halfW - margin;
+  // minZ/maxZ in world coords, ensuring minZ < maxZ
+  const worldZ1 = roomEdgeZ + zSign * margin;
+  const worldZ2 = habitatFarZ - zSign * margin;
+  const innerMinZ = Math.min(worldZ1, worldZ2);
+  const innerMaxZ = Math.max(worldZ1, worldZ2);
+
+  const midX = cx;
+  const midZ = (innerMinZ + innerMaxZ) / 2;
+
+  // Glass front z = roomEdgeZ (where the room's glass wall is)
+  g.userData = {
+    aquariumBounds: { minX: innerMinX, maxX: innerMaxX, minZ: innerMinZ, maxZ: innerMaxZ },
+    glassFront: {
+      z: roomEdgeZ,
+      facing: extensionSide === 'north' ? 'south' : 'north',
+    },
+    decorationPoints: [
+      { x: innerMinX + 0.5, z: innerMaxZ - 0.3, type: 'plant' },
+      { x: innerMaxX - 0.5, z: innerMaxZ - 0.5, type: 'rock' },
+      { x: midX, z: midZ, type: 'ball' },
+      { x: innerMinX + 1.5, z: innerMinZ + 0.3, type: 'terminal' },
+      { x: innerMaxX - 1.5, z: innerMinZ + 0.5, type: 'tube' },
+    ],
+  };
 
   return makeResult(g, colliders);
 }
@@ -377,12 +442,15 @@ export function getPropsForRoom(roomData) {
       results.push(createShelf(cx - 7, cz, Math.PI / 2));
       break;
 
-    case 'containment':
-      // Containment chamber in center
-      results.push(createContainmentChamber(cx, cz));
-      // Monitoring desk to one side
-      results.push(createDesk(cx - 5, cz, Math.PI / 2));
+    case 'containment': {
+      // Habitat extension beyond the glass wall
+      const extSide = (roomData.id === 'contain_a' || roomData.id === 'contain_b') ? 'north' : 'south';
+      results.push(createHabitat(cx, cz, w, d, roomData.ceilingHeight, extSide, 4));
+      // Monitoring desk in observation area (room interior)
+      const deskZ = extSide === 'north' ? cz - 2 : cz + 2;
+      results.push(createDesk(cx - 3, deskZ, extSide === 'north' ? 0 : Math.PI));
       break;
+    }
 
     case 'water_filtration':
       results.push(createWaterTank(cx - 2, cz - 1));

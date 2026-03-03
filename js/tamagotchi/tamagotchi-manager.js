@@ -20,7 +20,7 @@ export class TamagotchiManager {
       const roomId = tama.personality.roomId;
       const chamberInfo = chamberMap[roomId];
       if (chamberInfo) {
-        tama.attachToChamber(chamberInfo.group, chamberInfo.glassPanels);
+        tama.attachToChamber(chamberInfo);
       } else {
         console.warn(`No chamber found for ${tama.id} in room ${roomId}`);
       }

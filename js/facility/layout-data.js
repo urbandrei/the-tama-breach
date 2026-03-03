@@ -178,7 +178,7 @@ export const hallways = [
 // position: offset along that wall (0 = center)
 export const doorways = [
   // --- Entryway ---
-  { roomId: 'entryway', wallSide: 'south', position: 0 },  // main entrance
+  // South wall is solid (no exterior exit)
   { roomId: 'entryway', wallSide: 'north', position: 0 },  // → hall_entry_storage
 
   // --- Storage ---

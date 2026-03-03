@@ -42,6 +42,7 @@ export class BillboardSprite {
     });
 
     this.sprite = new THREE.Sprite(material);
+    this.sprite.frustumCulled = false;
 
     const aspect = this._canvas.width / this._canvas.height;
     this.sprite.scale.set(SPRITE_SCALE * aspect, SPRITE_SCALE, 1);

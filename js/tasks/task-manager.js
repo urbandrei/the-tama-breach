@@ -131,10 +131,13 @@ export class TaskManager {
   }
 
   update(dt) {
-    // Update all active tasks
+    const playerPos = this.game.player.position;
     for (const task of this._taskList) {
       if (task.state === TaskState.ACTIVE) {
         task.update(dt);
+      }
+      if (task.state === TaskState.PENDING || task.state === TaskState.FAILED) {
+        task.updateHighlight(dt, playerPos);
       }
     }
   }

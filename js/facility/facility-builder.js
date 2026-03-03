@@ -11,7 +11,8 @@ export class FacilityBuilder {
     this.rooms = [];
     this.hallways = [];
     this.doors = [];
-    this.containmentChambers = {}; // roomId -> { group, glassPanels }
+    this.containmentChambers = {}; // roomId -> { group, glassPanels, ... }
+    this._roomGlassPanels = {};    // roomId -> glass panel meshes from Room
     this._built = false;
   }
 
@@ -27,10 +28,21 @@ export class FacilityBuilder {
 
   _buildRooms() {
     for (const roomData of rooms) {
-      const room = new Room(roomData, doorways);
+      // Containment rooms get a glass wall on the back side
+      let glassWall = null;
+      if (roomData.propType === 'containment') {
+        glassWall = (roomData.id === 'contain_a' || roomData.id === 'contain_b') ? 'north' : 'south';
+      }
+
+      const room = new Room(roomData, doorways, { glassWall });
       this.game.scene.add(room.group);
       this.game.physics.addColliders(this._worldColliders(room.group, room.colliders));
       this.rooms.push(room);
+
+      // Capture glass panels from the room for the containment system
+      if (room.glassPanels.length > 0) {
+        this._roomGlassPanels[roomData.id] = room.glassPanels;
+      }
     }
   }
 
@@ -93,18 +105,14 @@ export class FacilityBuilder {
           );
         }
 
-        // Capture containment chambers for tamagotchi system
-        if (result.group.name === 'containment_chamber') {
-          const glassPanels = [];
-          result.group.traverse((child) => {
-            if (child.isMesh && child.material &&
-                child.material.transparent && child.material.opacity < 1.0) {
-              glassPanels.push(child);
-            }
-          });
+        // Capture habitat extensions for tamagotchi system
+        if (result.group.name === 'containment_habitat') {
           this.containmentChambers[roomData.id] = {
             group: result.group,
-            glassPanels,
+            glassPanels: this._roomGlassPanels[roomData.id] || [],
+            aquariumBounds: result.group.userData.aquariumBounds,
+            decorationPoints: result.group.userData.decorationPoints,
+            glassFront: result.group.userData.glassFront,
           };
         }
       }
