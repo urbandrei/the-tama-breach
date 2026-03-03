@@ -26,7 +26,7 @@ export class Game {
     // Scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x000000);
-    this.scene.fog = new THREE.FogExp2(0x000000, 0.025);
+    this.scene.fog = new THREE.FogExp2(0x000000, 0.003);
 
     // Camera
     this.camera = new THREE.PerspectiveCamera(
@@ -47,7 +47,9 @@ export class Game {
     this.facility = null;
     this.lightingManager = null;
     this.tamagotchiManager = null;
+    this.taskManager = null;
     this.deviceManager = null;
+    this.taskHUD = null;
 
     // Clock
     this._clock = new THREE.Clock();
@@ -59,7 +61,7 @@ export class Game {
 
     // Pointer lock on click (not while device is open)
     canvas.addEventListener('click', () => {
-      if (!this.input.isPointerLocked && this.state !== GameState.DEVICE_OPEN) {
+      if (!this.input.isPointerLocked && this.state !== GameState.DEVICE_OPEN && this.state !== GameState.TASK_ACTIVE) {
         this.input.requestPointerLock();
       }
     });
@@ -108,12 +110,14 @@ export class Game {
   }
 
   _update(dt) {
-    if (this.state === GameState.PLAYING || this.state === GameState.DEVICE_OPEN) {
+    if (this.state === GameState.PLAYING || this.state === GameState.DEVICE_OPEN || this.state === GameState.TASK_ACTIVE) {
       this.player.update(dt);
       if (this.facility) this.facility.update(dt);
       if (this.tamagotchiManager) this.tamagotchiManager.update(dt);
       if (this.lightingManager) this.lightingManager.update(dt);
       if (this.deviceManager) this.deviceManager.update(dt);
+      if (this.taskManager) this.taskManager.update(dt);
+      if (this.taskHUD) this.taskHUD.update(dt);
     }
   }
 

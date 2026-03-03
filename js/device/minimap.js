@@ -142,7 +142,7 @@ export class Minimap {
       ctx.fill();
 
       // Direction arrow
-      const yaw = this.game.player._yaw ? this.game.player._yaw.rotation.y : 0;
+      const yaw = this.game.player.yaw ? this.game.player.yaw.rotation.y : 0;
       const arrowLen = 8;
       // yaw=0 faces -Z (south on screen = down), rotating left increases yaw
       const ax = dotX + Math.sin(yaw) * -arrowLen;

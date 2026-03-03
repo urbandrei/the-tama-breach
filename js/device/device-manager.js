@@ -39,6 +39,7 @@ export class DeviceManager {
   }
 
   _open() {
+    if (this.game.state === GameState.TASK_ACTIVE) return;
     this.isOpen = true;
     this.game.state = GameState.DEVICE_OPEN;
     this.game.player.deviceOpen = true;

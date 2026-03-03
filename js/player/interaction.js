@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { INTERACT_RANGE } from '../core/constants.js';
+import { INTERACT_RANGE, GameState } from '../core/constants.js';
 
 export class Interaction {
   constructor(game, camera) {
@@ -22,6 +22,13 @@ export class Interaction {
   }
 
   update() {
+    // Skip interaction prompts when device or task overlay is active
+    if (this.game.state === GameState.DEVICE_OPEN || !this.game.player.movementEnabled) {
+      this._currentTarget = null;
+      this._hidePrompt();
+      return;
+    }
+
     // Cast ray from camera center forward
     this._raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
     const hits = this._raycaster.intersectObjects(this.interactables, false);

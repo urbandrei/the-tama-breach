@@ -14,10 +14,13 @@ export class Tamagotchi {
     this.needs = new NeedsSystem(personality);
     this.containment = new Containment();
 
+    // Use first frame of idle animation
     this.billboardSprite = new BillboardSprite(
-      personality.sprite.idle,
+      personality.sprite.idle[0],
       '#00ff41',
     );
+    // Start idle animation cycling
+    this.billboardSprite.setAnimation(personality.sprite.idle, '#00ff41', 0.8);
 
     this._chamberGroup = null;
     this._spriteAdded = false;
@@ -78,7 +81,13 @@ export class Tamagotchi {
   }
 
   _onAgitated() {
-    this.billboardSprite.setAscii(this.personality.sprite.agitated, '#ff4444');
+    this.billboardSprite.setAnimation(this.personality.sprite.agitated, '#ff4444', 0.3);
+    this.billboardSprite.setGlitch(0.3);
+
+    if (this.game.lightingManager) {
+      this.game.lightingManager.setAgitatedFlicker(this.personality.roomId, true);
+    }
+
     this.game.emit('tama:agitated', {
       tamaId: this.id,
       roomId: this.personality.roomId,
@@ -86,7 +95,13 @@ export class Tamagotchi {
   }
 
   _onCalmed() {
-    this.billboardSprite.setAscii(this.personality.sprite.idle, '#00ff41');
+    this.billboardSprite.setAnimation(this.personality.sprite.idle, '#00ff41', 0.8);
+    this.billboardSprite.clearGlitch();
+
+    if (this.game.lightingManager) {
+      this.game.lightingManager.setAgitatedFlicker(this.personality.roomId, false);
+    }
+
     this.game.emit('tama:calmed', {
       tamaId: this.id,
       roomId: this.personality.roomId,
@@ -125,8 +140,8 @@ export class Tamagotchi {
       personality: this.personality.description,
       status: this.state,
       sprite: this.state === TamaState.AGITATED
-        ? this.personality.sprite.agitated
-        : this.personality.sprite.idle,
+        ? this.personality.sprite.agitated[0]
+        : this.personality.sprite.idle[0],
       needs: { ...this.needs.needs },
       contentment: this.needs.getContentment(),
       glassHealth: this.containment.glassHealth,
@@ -143,7 +158,12 @@ export class Tamagotchi {
     this.state = TamaState.CONTAINED;
     this.needs.reset();
     this.containment.reset();
-    this.billboardSprite.setAscii(this.personality.sprite.idle, '#00ff41');
+    this.billboardSprite.clearGlitch();
+    this.billboardSprite.setAnimation(this.personality.sprite.idle, '#00ff41', 0.8);
+
+    if (this.game.lightingManager) {
+      this.game.lightingManager.setAgitatedFlicker(this.personality.roomId, false);
+    }
 
     if (this._chamberGroup && !this._spriteAdded) {
       const pos = this._chamberGroup.position;
