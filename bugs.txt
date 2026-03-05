@@ -1,0 +1,9 @@
+Was not able to pick up water bowl from water filtration room when there was a water fixing task first, no e to interact.
+When power went out and tamagotchi escaped, was not able to interact with generator, did not see lure.
+Tamagotchi, when escaped should explore more, should actively search for player, and be more aggressive, faster, and more sensitve to noises the longer it's out.
+Chance for tamagotchi to break items in cage, need to be replaced
+Add restock QTE for supply room, order new items (like lures, items, etc)
+Add a charging station with a loading bar to see the current charge level in office, when device is dead, you can't complete tasks, and the charging station should be the only task in the minimap with escort attached.
+there should be a lure item, and it should be highlighted when the power is out, escape is happening.
+When standing right next to the containment chambers, you can't press e.
+Make the target area for interactable meshes a bounding box with a little margin, right now ray tracing can go between shelves for instance.

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DOOR_WIDTH, DOOR_HEIGHT } from './layout-data.js';
+import { DOOR_WIDTH, DOOR_HEIGHT, WALL_THICKNESS } from './layout-data.js';
 import { dampedLerp } from '../utils/math-utils.js';
 
 const DOOR_THICKNESS = 0.12;
@@ -20,7 +20,8 @@ const frameMat = new THREE.MeshStandardMaterial({
 });
 
 export class Door {
-  constructor(worldX, worldZ, wallSide) {
+  constructor(worldX, worldZ, wallSide, game = null) {
+    this.game = game;
     this.group = new THREE.Group();
     this.group.name = 'door';
     this.colliders = [];
@@ -28,6 +29,7 @@ export class Door {
     this._openAmount = 0;
     this._targetOpen = 0;
     this._autoCloseTimer = 0;
+    this.locked = false;
 
     // Orient door based on which wall it sits on
     // Door slides along the wall plane
@@ -39,13 +41,14 @@ export class Door {
     }
 
     // Door frame posts (left and right)
-    const postGeo = new THREE.BoxGeometry(0.1, DOOR_HEIGHT, 0.15);
+    // Frame posts sit inside the doorway opening (inset from wall reveal face)
+    const postGeo = new THREE.BoxGeometry(0.1, DOOR_HEIGHT, WALL_THICKNESS);
     const leftPost = new THREE.Mesh(postGeo, frameMat);
-    leftPost.position.set(-DOOR_WIDTH / 2 - 0.05, DOOR_HEIGHT / 2, 0);
+    leftPost.position.set(-DOOR_WIDTH / 2 + 0.05, DOOR_HEIGHT / 2, 0);
     this.group.add(leftPost);
 
     const rightPost = new THREE.Mesh(postGeo, frameMat);
-    rightPost.position.set(DOOR_WIDTH / 2 + 0.05, DOOR_HEIGHT / 2, 0);
+    rightPost.position.set(DOOR_WIDTH / 2 - 0.05, DOOR_HEIGHT / 2, 0);
     this.group.add(rightPost);
 
     // Sliding panel
@@ -85,7 +88,19 @@ export class Door {
     return this._trigger;
   }
 
+  lock() {
+    this.locked = true;
+    this.close();
+    this._trigger.userData.interactable.promptText = '[LOCKED]';
+  }
+
+  unlock() {
+    this.locked = false;
+    this._trigger.userData.interactable.promptText = '[E] Open Door';
+  }
+
   toggle() {
+    if (this.locked) return;
     if (this._targetOpen < 0.5) {
       this.open();
     } else {
@@ -94,14 +109,26 @@ export class Door {
   }
 
   open() {
+    if (this.locked) return;
     this._targetOpen = 1;
     this._autoCloseTimer = AUTO_CLOSE_TIME;
     this._trigger.userData.interactable.promptText = '[E] Close Door';
+    this._emitNoise();
   }
 
   close() {
     this._targetOpen = 0;
-    this._trigger.userData.interactable.promptText = '[E] Open Door';
+    this._trigger.userData.interactable.promptText = this.locked ? '[LOCKED]' : '[E] Open Door';
+    this._emitNoise();
+  }
+
+  _emitNoise() {
+    if (this.game) {
+      this.game.emit('door:noise', {
+        x: this.group.position.x,
+        z: this.group.position.z,
+      });
+    }
   }
 
   update(dt) {

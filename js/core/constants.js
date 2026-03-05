@@ -1,7 +1,7 @@
 // Player movement
 export const PLAYER_SPEED = 5;
 export const PLAYER_SPRINT_MULTIPLIER = 1.8;
-export const PLAYER_JUMP_FORCE = 8;
+export const PLAYER_JUMP_FORCE = 5;
 export const PLAYER_GRAVITY = 20;
 export const PLAYER_STAND_HEIGHT = 1.7;
 export const PLAYER_CROUCH_HEIGHT = 0.8;
@@ -10,6 +10,12 @@ export const PLAYER_CROUCH_SPEED_MULTIPLIER = 0.5;
 export const PLAYER_CART_SPEED_MULTIPLIER = 0.4;
 export const PLAYER_ACCELERATION = 25;
 export const PLAYER_DECELERATION = 15;
+
+// Stamina
+export const PLAYER_MAX_STAMINA = 100;
+export const PLAYER_STAMINA_DRAIN = 20;
+export const PLAYER_STAMINA_REGEN = 15;
+export const PLAYER_STAMINA_REGEN_DELAY = 1.0;
 
 // Mouse
 export const MOUSE_SENSITIVITY = 0.002;

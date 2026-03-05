@@ -1,91 +1,30 @@
 import * as THREE from 'three';
-import { rooms, hallways, doorways, DOOR_HEIGHT } from './layout-data.js';
+import { rooms, doorways, DOOR_WIDTH, DOOR_HEIGHT, WALL_THICKNESS } from './layout-data.js';
 
-const SIGN_WIDTH = 2.0;
+const SIGN_WIDTH = 1.6;   // how far the sign extends into the hallway
 const SIGN_HEIGHT = 0.35;
-const SIGN_Y = (DOOR_HEIGHT || 2.8) + 0.2;
-const WALL_OFFSET = 0.15; // offset from wall face to avoid z-fighting
+// Top of sign aligns with top of door frame
+const SIGN_Y = DOOR_HEIGHT - SIGN_HEIGHT / 2;
+
+// Center rooms sit on the inner edge of the hallway loop
+const INNER_ROOMS = new Set(['lab', 'food_processing', 'server_room', 'generator_room']);
 
 export class RoomSigns {
   constructor(scene) {
     this._signs = [];
     this._materials = [];
-    this._destMap = this._buildDestinationMap();
     this._buildSigns(scene);
   }
 
-  /**
-   * For each doorway, find which room is on the other end of the hallway.
-   * Returns a Map keyed by doorway index → destination room label.
-   */
-  _buildDestinationMap() {
-    const destMap = new Map();
-
-    for (let i = 0; i < doorways.length; i++) {
-      const dw = doorways[i];
-      const room = rooms.find(r => r.id === dw.roomId);
-      if (!room) continue;
-
-      const [cx, cz] = room.center;
-      const [w, h] = room.size;
-
-      // Compute wall-face world coordinate for this doorway
-      let wallX, wallZ;
-      switch (dw.wallSide) {
-        case 'north': wallX = cx + dw.position; wallZ = cz + h / 2; break;
-        case 'south': wallX = cx + dw.position; wallZ = cz - h / 2; break;
-        case 'east':  wallX = cx + w / 2; wallZ = cz + dw.position; break;
-        case 'west':  wallX = cx - w / 2; wallZ = cz + dw.position; break;
-        default: continue;
-      }
-
-      // Find hallway with an endpoint matching this doorway position
-      for (const hall of hallways) {
-        const [sx, sz] = hall.start;
-        const [ex, ez] = hall.end;
-
-        const startDist = Math.abs(sx - wallX) + Math.abs(sz - wallZ);
-        const endDist = Math.abs(ex - wallX) + Math.abs(ez - wallZ);
-
-        let otherEnd = null;
-        if (startDist < 1.5) otherEnd = [ex, ez];
-        else if (endDist < 1.5) otherEnd = [sx, sz];
-
-        if (otherEnd) {
-          const destRoom = this._findRoomAtWall(otherEnd[0], otherEnd[1]);
-          if (destRoom) {
-            destMap.set(i, destRoom.label);
-          }
-          break;
-        }
-      }
+  setAlert(active) {
+    const hex = active ? 0xff2222 : 0x00ff41;
+    for (const mat of this._materials) {
+      mat.emissive.setHex(hex);
     }
-
-    return destMap;
-  }
-
-  /** Find which room has a wall at the given world coordinate. */
-  _findRoomAtWall(x, z) {
-    for (const r of rooms) {
-      const [cx, cz] = r.center;
-      const [w, h] = r.size;
-      const tol = 1.5;
-
-      // North wall
-      if (Math.abs(z - (cz + h / 2)) < tol && x >= cx - w / 2 - tol && x <= cx + w / 2 + tol) return r;
-      // South wall
-      if (Math.abs(z - (cz - h / 2)) < tol && x >= cx - w / 2 - tol && x <= cx + w / 2 + tol) return r;
-      // East wall
-      if (Math.abs(x - (cx + w / 2)) < tol && z >= cz - h / 2 - tol && z <= cz + h / 2 + tol) return r;
-      // West wall
-      if (Math.abs(x - (cx - w / 2)) < tol && z >= cz - h / 2 - tol && z <= cz + h / 2 + tol) return r;
-    }
-    return null;
   }
 
   _buildSigns(scene) {
-    for (let i = 0; i < doorways.length; i++) {
-      const dw = doorways[i];
+    for (const dw of doorways) {
       const roomData = rooms.find(r => r.id === dw.roomId);
       if (!roomData) continue;
 
@@ -94,62 +33,61 @@ export class RoomSigns {
       const halfW = w / 2;
       const halfH = h / 2;
 
-      let doorX, doorZ, hallRotY, roomRotY, offsetX, offsetZ;
+      let doorX, doorZ;
+      let extendX = 0, extendZ = 0;
+      let signRotY;
+      // Offset along wall to right side of door (facing door from hallway)
+      let rightX = 0, rightZ = 0;
+
       switch (dw.wallSide) {
         case 'north':
           doorX = cx + dw.position;
           doorZ = cz + halfH;
-          hallRotY = 0;        // faces +Z (into hallway)
-          roomRotY = Math.PI;  // faces -Z (into room)
-          offsetX = 0;
-          offsetZ = WALL_OFFSET;
+          extendZ = 1;
+          signRotY = Math.PI / 2;
+          // Facing south from hallway → right is -X
+          rightX = -DOOR_WIDTH / 2;
           break;
         case 'south':
           doorX = cx + dw.position;
           doorZ = cz - halfH;
-          hallRotY = Math.PI;  // faces -Z (into hallway)
-          roomRotY = 0;        // faces +Z (into room)
-          offsetX = 0;
-          offsetZ = -WALL_OFFSET;
+          extendZ = -1;
+          signRotY = Math.PI / 2;
+          // Facing north from hallway → right is +X
+          rightX = DOOR_WIDTH / 2;
           break;
         case 'east':
           doorX = cx + halfW;
           doorZ = cz + dw.position;
-          hallRotY = Math.PI / 2;   // faces +X (into hallway)
-          roomRotY = -Math.PI / 2;  // faces -X (into room)
-          offsetX = WALL_OFFSET;
-          offsetZ = 0;
+          extendX = 1;
+          signRotY = 0;
+          // Facing west from hallway → right is +Z
+          rightZ = DOOR_WIDTH / 2;
           break;
         case 'west':
           doorX = cx - halfW;
           doorZ = cz + dw.position;
-          hallRotY = -Math.PI / 2;  // faces -X (into hallway)
-          roomRotY = Math.PI / 2;   // faces +X (into room)
-          offsetX = -WALL_OFFSET;
-          offsetZ = 0;
+          extendX = -1;
+          signRotY = 0;
+          // Facing east from hallway → right is -Z
+          rightZ = -DOOR_WIDTH / 2;
           break;
         default:
           continue;
       }
 
-      // Hallway-facing sign: shows this room's name (so you know what you're entering)
-      const hallSign = this._createSign(roomData.label);
-      hallSign.mesh.position.set(doorX + offsetX, SIGN_Y, doorZ + offsetZ);
-      hallSign.mesh.rotation.y = hallRotY;
-      scene.add(hallSign.mesh);
-      this._signs.push(hallSign.mesh);
-      this._materials.push(hallSign.material);
+      // Inner rooms: sign on left side of door; outer rooms: right side
+      const side = INNER_ROOMS.has(dw.roomId) ? -1 : 1;
+      const wallOffset = WALL_THICKNESS / 2;
+      const signX = doorX + side * rightX + extendX * (SIGN_WIDTH / 2 + wallOffset);
+      const signZ = doorZ + side * rightZ + extendZ * (SIGN_WIDTH / 2 + wallOffset);
 
-      // Room-interior-facing sign: shows where the hallway leads (destination)
-      const destLabel = this._destMap.get(i);
-      if (destLabel) {
-        const roomSign = this._createSign(destLabel);
-        roomSign.mesh.position.set(doorX - offsetX, SIGN_Y, doorZ - offsetZ);
-        roomSign.mesh.rotation.y = roomRotY;
-        scene.add(roomSign.mesh);
-        this._signs.push(roomSign.mesh);
-        this._materials.push(roomSign.material);
-      }
+      const sign = this._createSign(roomData.label);
+      sign.group.position.set(signX, SIGN_Y, signZ);
+      sign.group.rotation.y = signRotY;
+      scene.add(sign.group);
+      this._signs.push(sign.group);
+      this._materials.push(sign.material);
     }
   }
 
@@ -172,7 +110,6 @@ export class RoomSigns {
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
 
-    // Always visible — signs glow at all times
     const material = new THREE.MeshStandardMaterial({
       color: 0x000000,
       emissive: 0x00ff41,
@@ -181,7 +118,19 @@ export class RoomSigns {
       transparent: true,
     });
 
-    const geo = new THREE.PlaneGeometry(SIGN_WIDTH, SIGN_HEIGHT);
-    return { mesh: new THREE.Mesh(geo, material), material };
+    // Front face (default +Z)
+    const frontGeo = new THREE.PlaneGeometry(SIGN_WIDTH, SIGN_HEIGHT);
+    const frontMesh = new THREE.Mesh(frontGeo, material);
+
+    // Back face — rotation alone mirrors correctly, no UV flip needed
+    const backGeo = new THREE.PlaneGeometry(SIGN_WIDTH, SIGN_HEIGHT);
+    const backMesh = new THREE.Mesh(backGeo, material);
+    backMesh.rotation.y = Math.PI;
+
+    const group = new THREE.Group();
+    group.add(frontMesh);
+    group.add(backMesh);
+
+    return { group, material };
   }
 }

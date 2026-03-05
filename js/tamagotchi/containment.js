@@ -77,6 +77,41 @@ export class Containment {
     }
   }
 
+  takeDamage(amount) {
+    if (this._breached) return;
+    this.glassHealth = Math.max(0, this.glassHealth - amount);
+    const prev = this.crackStage;
+    this._recalcStage();
+    if (this._breached) return; // let normal update() handle breach
+    if (this.crackStage !== prev) {
+      this._updateGlassVisuals();
+    }
+  }
+
+  repairPartial(amount) {
+    if (this._breached) return;
+    this.glassHealth = Math.min(100, this.glassHealth + amount);
+    const prev = this.crackStage;
+    this._recalcStage();
+    if (this.crackStage !== prev) {
+      this._updateGlassVisuals();
+    }
+  }
+
+  _recalcStage() {
+    if (this.glassHealth <= 0) {
+      this.crackStage = CrackStage.BREACHED;
+    } else if (this.glassHealth <= 25) {
+      this.crackStage = CrackStage.CRITICAL;
+    } else if (this.glassHealth <= 50) {
+      this.crackStage = CrackStage.MAJOR;
+    } else if (this.glassHealth <= 75) {
+      this.crackStage = CrackStage.HAIRLINE;
+    } else {
+      this.crackStage = CrackStage.CLEAN;
+    }
+  }
+
   repair() {
     this.glassHealth = 100;
     this.crackStage = CrackStage.CLEAN;

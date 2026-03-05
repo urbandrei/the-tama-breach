@@ -1,0 +1,24 @@
+Was not able to pick up water bowl from water filtration room when there was a water fixing task first, no e to interact.
+When power went out and Tamagotchi escaped, was not able to interact with generator, did not see lure.
+Tamagotchi, when escaped should explore more, should actively search for player, and be more aggressive, faster, and more sensitive to noises the longer it's out.
+Chance for Tamagotchi to break items in cage, need to be replaced
+Add restock QTE for supply room, order new items (like lures, items, etc.)
+Add a charging station with a loading bar to see the current charge level in office, when device is dead, you can't complete tasks, and the charging station should be the only task in the mini-map with escort attached.
+there should be a lure item, and it should be highlighted when the power is out, escape is happening.
+When standing right next to the containment chambers, you can't press e.
+Make the target area for interactable meshes a bounding box with a little margin, right now ray tracing can go between shelves for instance.
+Manual feeding should be done with physical, labeled buttons on the wall of the containment chambers.
+Clicking on the glass mesh anywhere should trigger the glass repair, glass should not self repair, glass was not interactable even with e (bug?)
+Lure should not be interactable if there isn't an escaped Tamagotchi.
+Make escort path avoid walls, go through doors.
+Task list on device should instead list all task types, and mark them as active or not active.
+Night end should be returning to the elevator, within 1 minute. Need to clock out before going to elevator in control room.
+The starting QTE in the control room should be clicking a clock in button.
+Add a little minigame to play on device if times are slow.
+Instead of a tabbed device, have more OS-lite style, with apps and exit buttons and stuff.
+Add more unique QTEs for each of the room types.
+For the remote Tamagotchi feeding, instead of buttons, have drag and drop toys, food, and water.
+In the last minute, no tasks should be active.
+If miss elevators, end game, fired for overtime, body not found.
+In the beginning, have the watch have the name of the game, start, settings, credits. Pressing start should show the day 1 for a second, and then close device and elevator should land a second later.
+Tamagotchi is trademarked, let's move away from that verbiage, and change the title and references in the game and code.

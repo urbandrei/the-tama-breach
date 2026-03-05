@@ -142,68 +142,42 @@ export function createHabitat(cx, cz, roomW, roomD, ceilingH, extensionSide, ext
   ceiling.position.y = ceilingH;
   g.add(ceiling);
 
+  // Walls (BoxGeometry — visible + collider in one mesh)
+  const wt = 0.3;
+  const colliders = [floorCol];
+
   // Back wall (far end, opposite the glass)
-  const backWallRotY = extensionSide === 'north' ? Math.PI : 0;
   const backWall = new THREE.Mesh(
-    new THREE.PlaneGeometry(roomW, ceilingH),
+    new THREE.BoxGeometry(roomW, ceilingH, wt),
     habitatWallMat
   );
   backWall.position.set(0, ceilingH / 2, zSign * halfExtD);
-  backWall.rotation.y = backWallRotY;
+  backWall.castShadow = true;
   backWall.receiveShadow = true;
   g.add(backWall);
+  colliders.push(backWall);
 
   // Left wall (west side)
   const leftWall = new THREE.Mesh(
-    new THREE.PlaneGeometry(extensionD, ceilingH),
+    new THREE.BoxGeometry(wt, ceilingH, extensionD),
     habitatWallMat
   );
   leftWall.position.set(-halfW, ceilingH / 2, 0);
-  leftWall.rotation.y = Math.PI / 2;
+  leftWall.castShadow = true;
   leftWall.receiveShadow = true;
   g.add(leftWall);
+  colliders.push(leftWall);
 
   // Right wall (east side)
   const rightWall = new THREE.Mesh(
-    new THREE.PlaneGeometry(extensionD, ceilingH),
+    new THREE.BoxGeometry(wt, ceilingH, extensionD),
     habitatWallMat
   );
   rightWall.position.set(halfW, ceilingH / 2, 0);
-  rightWall.rotation.y = -Math.PI / 2;
+  rightWall.castShadow = true;
   rightWall.receiveShadow = true;
   g.add(rightWall);
-
-  // Colliders for the 3 solid walls
-  const colliders = [floorCol];
-  const invisMat = new THREE.MeshBasicMaterial({ visible: false });
-  const wt = 0.3; // wall thickness for colliders
-
-  // Back wall collider
-  const backCol = new THREE.Mesh(
-    new THREE.BoxGeometry(roomW, ceilingH, wt),
-    invisMat
-  );
-  backCol.position.set(0, ceilingH / 2, zSign * halfExtD);
-  g.add(backCol);
-  colliders.push(backCol);
-
-  // Left wall collider
-  const leftCol = new THREE.Mesh(
-    new THREE.BoxGeometry(wt, ceilingH, extensionD),
-    invisMat
-  );
-  leftCol.position.set(-halfW, ceilingH / 2, 0);
-  g.add(leftCol);
-  colliders.push(leftCol);
-
-  // Right wall collider
-  const rightCol = new THREE.Mesh(
-    new THREE.BoxGeometry(wt, ceilingH, extensionD),
-    invisMat
-  );
-  rightCol.position.set(halfW, ceilingH / 2, 0);
-  g.add(rightCol);
-  colliders.push(rightCol);
+  colliders.push(rightWall);
 
   // Decoration waypoints (world coordinates — inside the habitat)
   const margin = 1.0;
@@ -408,6 +382,279 @@ export function createElectricalPanel(x, z, rotation = 0) {
   return makeResult(g);
 }
 
+// --- ELEVATOR SHAFT ---
+const SHAFT_HEIGHT = 35;
+const SHAFT_WALL_COLOR = 0x2a2a30;
+const BAND_COLOR = 0x334455;
+const BAND_EMISSIVE = 0x112233;
+const BAND_SPACING = 4.0;
+const PLATFORM_Y = 0;
+
+const shaftWallMat = new THREE.MeshStandardMaterial({
+  color: SHAFT_WALL_COLOR,
+  roughness: 0.9,
+  side: THREE.DoubleSide,
+});
+
+export function createElevatorShaft(cx, cz, roomW, roomD) {
+  const g = new THREE.Group();
+  g.name = 'elevator_shaft';
+
+  const hw = roomW / 2;
+  const hd = roomD / 2;
+  const shaftH = SHAFT_HEIGHT;
+
+  // Shaft walls (extend from room ceiling height up to SHAFT_HEIGHT)
+  const roomCeil = 4.0;
+  const extH = shaftH - roomCeil;
+
+  // North wall
+  const northWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(roomW, extH),
+    shaftWallMat
+  );
+  northWall.position.set(cx, roomCeil + extH / 2, cz + hd);
+  northWall.rotation.y = Math.PI;
+  g.add(northWall);
+
+  // South wall
+  const southWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(roomW, extH),
+    shaftWallMat
+  );
+  southWall.position.set(cx, roomCeil + extH / 2, cz - hd);
+  g.add(southWall);
+
+  // West wall
+  const westWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(roomD, extH),
+    shaftWallMat
+  );
+  westWall.position.set(cx - hw, roomCeil + extH / 2, cz);
+  westWall.rotation.y = Math.PI / 2;
+  g.add(westWall);
+
+  // East wall
+  const eastWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(roomD, extH),
+    shaftWallMat
+  );
+  eastWall.position.set(cx + hw, roomCeil + extH / 2, cz);
+  eastWall.rotation.y = -Math.PI / 2;
+  g.add(eastWall);
+
+  // Emissive light bands on shaft walls (horizontal strips at intervals)
+  const bandMat = new THREE.MeshStandardMaterial({
+    color: BAND_COLOR,
+    emissive: BAND_EMISSIVE,
+    emissiveIntensity: 1.5,
+    roughness: 0.3,
+  });
+
+  const bands = [];
+  const bandH = 0.15;
+  const bandCount = Math.floor(shaftH / BAND_SPACING);
+
+  for (let i = 0; i < bandCount; i++) {
+    const y = BAND_SPACING + i * BAND_SPACING;
+
+    // Band on west wall
+    const bandW = new THREE.Mesh(
+      new THREE.PlaneGeometry(roomD - 1, bandH),
+      bandMat
+    );
+    bandW.position.set(cx - hw + 0.05, y, cz);
+    bandW.rotation.y = Math.PI / 2;
+    g.add(bandW);
+    bands.push(bandW);
+
+    // Band on east wall (door side)
+    const bandE = new THREE.Mesh(
+      new THREE.PlaneGeometry(roomD - 1, bandH),
+      bandMat
+    );
+    bandE.position.set(cx + hw - 0.05, y, cz);
+    bandE.rotation.y = -Math.PI / 2;
+    g.add(bandE);
+    bands.push(bandE);
+  }
+
+  // Dark cap at shaft top (hides the open top)
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x000000, side: THREE.DoubleSide });
+  const cap = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), capMat);
+  cap.rotation.x = Math.PI / 2;
+  cap.position.set(cx, shaftH, cz);
+  g.add(cap);
+
+  // Dense fog layers filling the shaft — starts low, becomes impenetrable above
+  const fogLayers = 16;
+  const fogBottom = shaftH * 0.15; // fog starts low
+  const fogTop = shaftH - 0.3;
+  for (let i = 0; i < fogLayers; i++) {
+    const t = i / (fogLayers - 1); // 0 at bottom, 1 at top
+    const y = fogBottom + t * (fogTop - fogBottom);
+    const opacity = 0.06 + t * t * t * 0.85; // cubic ramp: 0.06 → 0.91
+    const fogMat = new THREE.MeshBasicMaterial({
+      color: 0x050810,
+      transparent: true,
+      opacity,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const fogPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(roomW + 0.5, roomD + 0.5),
+      fogMat
+    );
+    fogPlane.rotation.x = Math.PI / 2;
+    fogPlane.position.set(cx, y, cz);
+    fogPlane.renderOrder = 999;
+    g.add(fogPlane);
+  }
+
+  // Platform (movable slab)
+  const platformMat = new THREE.MeshStandardMaterial({ color: 0x555566, roughness: 0.5, metalness: 0.6 });
+  const platform = new THREE.Group();
+
+  // Platform floor
+  const slab = new THREE.Mesh(
+    new THREE.BoxGeometry(roomW - 1, 0.15, roomD - 1),
+    platformMat
+  );
+  slab.receiveShadow = true;
+  platform.add(slab);
+
+  // Railing posts
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x666677, roughness: 0.4, metalness: 0.7 });
+  const railH = 1.2;
+  const railGeo = new THREE.BoxGeometry(0.08, railH, 0.08);
+  const pHW = (roomW - 1) / 2 - 0.2;
+  const pHD = (roomD - 1) / 2 - 0.2;
+
+  // Posts on west, north, south sides (east side open for doors)
+  const railPositions = [
+    [-pHW, railH / 2, -pHD],  // west-south corner
+    [-pHW, railH / 2, pHD],   // west-north corner
+    [-pHW, railH / 2, 0],     // west midpoint
+    [pHW, railH / 2, -pHD],   // east-south corner (end of south rail)
+    [pHW, railH / 2, pHD],    // east-north corner (end of north rail)
+  ];
+  for (const [rx, ry, rz] of railPositions) {
+    const post = new THREE.Mesh(railGeo, railMat);
+    post.position.set(rx, ry, rz);
+    platform.add(post);
+  }
+
+  // Top rail bars — west side + north/south sides (no east rail, doors there)
+  const barGeoD = new THREE.BoxGeometry(0.06, 0.06, roomD - 1.4);
+  const westBar = new THREE.Mesh(barGeoD, railMat);
+  westBar.position.set(-pHW, railH, 0);
+  platform.add(westBar);
+
+  const barGeoW = new THREE.BoxGeometry(roomW - 1.4, 0.06, 0.06);
+  for (const side of [-1, 1]) {
+    const bar = new THREE.Mesh(barGeoW, railMat);
+    bar.position.set(0, railH, side * pHD);
+    platform.add(bar);
+  }
+
+  platform.position.set(cx, PLATFORM_Y, cz);
+  g.add(platform);
+
+  // Elevator doors (two panels that slide apart on east wall, at room level)
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x667788, roughness: 0.35, metalness: 0.7 });
+  const doorH = 2.8;
+  const doorPanelW = 1.8;
+
+  const leftDoor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, doorH, doorPanelW),
+    doorMat
+  );
+  leftDoor.position.set(cx + hw, doorH / 2, cz + doorPanelW / 2);
+  g.add(leftDoor);
+
+  const rightDoor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, doorH, doorPanelW),
+    doorMat
+  );
+  rightDoor.position.set(cx + hw, doorH / 2, cz - doorPanelW / 2);
+  g.add(rightDoor);
+
+  // Door colliders
+  const invisMat = new THREE.MeshBasicMaterial({ visible: false });
+  const leftDoorCol = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, doorH, doorPanelW),
+    invisMat
+  );
+  leftDoorCol.position.copy(leftDoor.position);
+  g.add(leftDoorCol);
+
+  const rightDoorCol = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, doorH, doorPanelW),
+    invisMat
+  );
+  rightDoorCol.position.copy(rightDoor.position);
+  g.add(rightDoorCol);
+
+  // Store refs for ElevatorManager to animate
+  g.userData = {
+    elevatorPlatform: platform,
+    elevatorDoors: { left: leftDoor, right: rightDoor },
+    elevatorDoorColliders: { left: leftDoorCol, right: rightDoorCol },
+    elevatorBands: bands,
+    shaftHeight: SHAFT_HEIGHT,
+    bandSpacing: BAND_SPACING,
+    roomCenter: [cx, cz],
+  };
+
+  const colliders = [leftDoorCol, rightDoorCol];
+
+  return makeResult(g, colliders);
+}
+
+// --- SECURITY CAMERA ---
+const camBodyMat = new THREE.MeshStandardMaterial({ color: 0x333340, roughness: 0.6, metalness: 0.5 });
+const camLensMat = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.2, metalness: 0.8 });
+
+export function createSecurityCamera(x, y, z, facingZ) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+
+  // Camera body
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.15, 0.15), camBodyMat);
+  g.add(body);
+
+  // Lens (cylinder protruding forward)
+  const lens = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 0.1, 6),
+    camLensMat
+  );
+  lens.rotation.x = Math.PI / 2;
+  lens.position.z = facingZ * 0.12;
+  g.add(lens);
+
+  // Mount bracket (connects to wall)
+  const bracket = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.06, 0.15),
+    darkMetalMat
+  );
+  bracket.position.set(0, 0.1, -facingZ * 0.05);
+  g.add(bracket);
+
+  // LED indicator
+  const ledMat = new THREE.MeshStandardMaterial({
+    color: 0x00ff44,
+    emissive: 0x00ff44,
+    emissiveIntensity: 1.0,
+  });
+  const led = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.03), ledMat);
+  led.position.set(0.08, 0.06, facingZ * 0.05);
+  g.add(led);
+
+  g.userData = { cameraLed: led };
+
+  return makeResult(g);
+}
+
 // --- Prop placement per room type ---
 export function getPropsForRoom(roomData) {
   const [cx, cz] = roomData.center;
@@ -417,29 +664,37 @@ export function getPropsForRoom(roomData) {
   const results = [];
 
   switch (roomData.propType) {
-    case 'entryway':
-      results.push(createDesk(cx - 2, cz, 0));
-      results.push(createCrate(cx + 2, cz + 1));
+    case 'lab':
+      results.push(createDesk(cx - 3, cz + 2, Math.PI));
+      results.push(createDesk(cx + 3, cz + 2, Math.PI));
+      results.push(createShelf(cx, cz - 3, 0));
       break;
 
-    case 'loading_dock':
-      // Crates and barrels scattered around
-      results.push(createCrate(cx - 4, cz - 3, 1.2));
-      results.push(createCrate(cx - 3, cz - 3));
-      results.push(createCrate(cx + 3, cz + 2));
-      results.push(createBarrel(cx + 4, cz - 2));
-      results.push(createBarrel(cx - 4, cz + 2));
-      results.push(createCrate(cx + 2, cz - 3, 0.8));
+    case 'food_processing':
+      results.push(createShelf(cx - 3, cz, Math.PI / 2));
+      results.push(createShelf(cx + 3, cz, -Math.PI / 2));
+      results.push(createCrate(cx, cz - 3));
       break;
 
-    case 'central_hub':
-      // Desks and a central desk area
-      results.push(createDesk(cx - 4, cz + 3, Math.PI / 2));
-      results.push(createDesk(cx - 4, cz - 3, Math.PI / 2));
-      results.push(createDesk(cx + 4, cz + 3, -Math.PI / 2));
-      results.push(createDesk(cx + 4, cz - 3, -Math.PI / 2));
-      results.push(createShelf(cx + 7, cz, -Math.PI / 2));
-      results.push(createShelf(cx - 7, cz, Math.PI / 2));
+    case 'generator_room':
+      // Panels on west wall (back, away from door)
+      results.push(createElectricalPanel(cx - hw + 0.5, cz, Math.PI / 2));
+      results.push(createElectricalPanel(cx - hw + 0.5, cz + 2, Math.PI / 2));
+      results.push(createElectricalPanel(cx - hw + 0.5, cz - 2, Math.PI / 2));
+      // Barrels on east side
+      results.push(createBarrel(cx + 2, cz + 2));
+      results.push(createBarrel(cx + 2, cz - 2));
+      break;
+
+    case 'elevator':
+      results.push(createElevatorShaft(cx, cz, w, d));
+      break;
+
+    case 'command_center':
+      results.push(createDesk(cx - 2, cz + 2, Math.PI));
+      results.push(createDesk(cx + 2, cz + 2, Math.PI));
+      results.push(createDesk(cx, cz - 2, 0));
+      results.push(createShelf(cx - hw + 1, cz, Math.PI / 2));
       break;
 
     case 'containment': {
@@ -449,6 +704,10 @@ export function getPropsForRoom(roomData) {
       // Monitoring desk in observation area (room interior)
       const deskZ = extSide === 'north' ? cz - 2 : cz + 2;
       results.push(createDesk(cx - 3, deskZ, extSide === 'north' ? 0 : Math.PI));
+      // Security camera on wall opposite the glass, high up
+      const camZ = extSide === 'north' ? cz - hd + 0.2 : cz + hd - 0.2;
+      const camFacingZ = extSide === 'north' ? 1 : -1;
+      results.push(createSecurityCamera(cx + 4, 3.2, camZ, camFacingZ));
       break;
     }
 
@@ -467,18 +726,10 @@ export function getPropsForRoom(roomData) {
       }
       break;
 
-    case 'electrical':
-      results.push(createElectricalPanel(cx - 3.5, cz, Math.PI / 2));
-      results.push(createElectricalPanel(cx - 3.5, cz + 2, Math.PI / 2));
-      results.push(createElectricalPanel(cx - 3.5, cz - 2, Math.PI / 2));
-      results.push(createCrate(cx + 2, cz + 2));
-      break;
-
     case 'storage':
-      // Shelves along side walls so they don't block north/south doors
-      results.push(createShelf(cx - 2, cz, Math.PI / 2));
-      results.push(createShelf(cx + 2, cz, -Math.PI / 2));
-      results.push(createCrate(cx + 1.5, cz - 1, 0.7));
+      results.push(createShelf(cx + hw - 1.5, cz + 1, -Math.PI / 2));
+      results.push(createShelf(cx + hw - 1.5, cz - 2, -Math.PI / 2));
+      results.push(createCrate(cx - 1, cz - 2, 0.7));
       break;
   }
 

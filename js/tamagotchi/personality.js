@@ -51,7 +51,7 @@ export const PERSONALITIES = {
         ],
       ],
     },
-    decayRates: { hunger: 1.8, happiness: 1.0, discipline: 0.8 },
+    decayRates: { hunger: 1.8, thirst: 1.0, happiness: 0.8 },
     agitationThreshold: 25,
     containmentStressRate: 2.0,
     preferredAction: 'FEED',
@@ -110,10 +110,10 @@ export const PERSONALITIES = {
         ],
       ],
     },
-    decayRates: { hunger: 0.8, happiness: 0.6, discipline: 1.4 },
+    decayRates: { hunger: 0.8, thirst: 1.4, happiness: 0.6 },
     agitationThreshold: 25,
     containmentStressRate: 1.5,
-    preferredAction: 'SCOLD',
+    preferredAction: 'WATER',
     preferredBonus: 5,
     ai: {
       wanderSpeed: 2.5,
@@ -169,7 +169,7 @@ export const PERSONALITIES = {
         ],
       ],
     },
-    decayRates: { hunger: 1.2, happiness: 1.5, discipline: 1.0 },
+    decayRates: { hunger: 1.2, thirst: 1.0, happiness: 1.5 },
     agitationThreshold: 25,
     containmentStressRate: 2.5,
     preferredAction: 'PLAY',
@@ -228,10 +228,10 @@ export const PERSONALITIES = {
         ],
       ],
     },
-    decayRates: { hunger: 1.4, happiness: 1.0, discipline: 2.0 },
+    decayRates: { hunger: 1.4, thirst: 2.0, happiness: 1.0 },
     agitationThreshold: 25,
     containmentStressRate: 3.0,
-    preferredAction: 'SCOLD',
+    preferredAction: 'WATER',
     preferredBonus: 5,
     ai: {
       wanderSpeed: 4.5,
@@ -241,9 +241,39 @@ export const PERSONALITIES = {
       soundRange: 6,
       behavior: 'aggressive',
     },
-    trait: 'Needs discipline most. Screen pulses red during chase.',
+    trait: 'Gets dehydrated fast. Screen pulses red during chase.',
   },
 };
+
+export const EGG_FRAMES = [
+  // Stage 0: Still egg
+  [
+    '    .---.   ',
+    '   /     \\  ',
+    '  |       | ',
+    '  |       | ',
+    '   \\     /  ',
+    '    `---\'   ',
+  ],
+  // Stage 1: Small crack
+  [
+    '    .---.   ',
+    '   /  \\  \\  ',
+    '  |  / \\ | ',
+    '  | /    | ',
+    '   \\     /  ',
+    '    `---\'   ',
+  ],
+  // Stage 2: Big crack + wiggle
+  [
+    '    .---.   ',
+    '   / \\|/ \\  ',
+    '  | /   \\ | ',
+    '  |/ \\|/  | ',
+    '   \\     /  ',
+    '    `---\'   ',
+  ],
+];
 
 export const TAMA_ORDER = ['nibbles', 'void', 'glitch', 'feral'];
 

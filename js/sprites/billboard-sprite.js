@@ -146,6 +146,103 @@ export class BillboardSprite {
     }
   }
 
+  setColor(color) {
+    this._color = color;
+    // Re-render current frame with new color
+    if (this._frames && this._frames.length > 0) {
+      this._renderToCanvas(this._frames[this._frameIndex], this._color);
+    }
+  }
+
+  setDirectionalAnimation(frontFrames, color, interval) {
+    if (color) this._color = color;
+    this._frameInterval = interval || 0.8;
+
+    // Auto-generate 4 directional variants from front frames
+    const back = frontFrames.map(frame => this._generateBack(frame));
+    const left = frontFrames.map(frame => this._generateLeft(frame));
+    const right = frontFrames.map(frame => this._generateRight(frame));
+
+    this._dirFrames = {
+      front: frontFrames,
+      back,
+      left,
+      right,
+    };
+    this._currentDirection = 'front';
+
+    // Start with front frames
+    this._frames = frontFrames;
+    this._frameIndex = 0;
+    this._frameTimer = 0;
+
+    if (frontFrames.length > 0) {
+      this._renderToCanvas(frontFrames[0], this._color);
+      const aspect = this._canvas.width / this._canvas.height;
+      this.sprite.scale.set(SPRITE_SCALE * aspect, SPRITE_SCALE, 1);
+    }
+  }
+
+  _generateBack(lines) {
+    const eyeChars = /[oO*@X0><~!]/g;
+    return lines.map(line => line.replace(eyeChars, ' '));
+  }
+
+  _generateLeft(lines) {
+    return lines.map(line => {
+      // Shift non-space content 1 position right, trim right edge
+      if (line.length === 0) return line;
+      const shifted = ' ' + line.slice(0, -1);
+      return shifted;
+    });
+  }
+
+  _generateRight(lines) {
+    // Mirror of left: reverse each line
+    return this._generateLeft(lines).map(line => line.split('').reverse().join(''));
+  }
+
+  setFacingDirection(forwardX, forwardZ, cameraPosition) {
+    if (!this._dirFrames) return;
+
+    const spritePos = this.sprite.position;
+
+    // Angle from sprite to camera
+    const toCamera = Math.atan2(
+      cameraPosition.x - spritePos.x,
+      cameraPosition.z - spritePos.z,
+    );
+    // Creature's facing angle
+    const creatureAngle = Math.atan2(forwardX, forwardZ);
+
+    // Relative angle (normalize to -PI..PI)
+    let relative = toCamera - creatureAngle;
+    while (relative > Math.PI) relative -= Math.PI * 2;
+    while (relative < -Math.PI) relative += Math.PI * 2;
+
+    let direction;
+    const absRel = Math.abs(relative);
+    if (absRel <= Math.PI / 4) {
+      direction = 'front'; // Camera sees the face
+    } else if (absRel >= Math.PI * 3 / 4) {
+      direction = 'back';
+    } else if (relative > 0) {
+      direction = 'right';
+    } else {
+      direction = 'left';
+    }
+
+    if (direction !== this._currentDirection) {
+      this._currentDirection = direction;
+      this._frames = this._dirFrames[direction];
+      // Keep frame index in bounds
+      if (this._frameIndex >= this._frames.length) {
+        this._frameIndex = 0;
+      }
+      this._renderToCanvas(this._frames[this._frameIndex], this._color);
+    }
+  }
+
   setGlitch(intensity) {
     this._glitchIntensity = intensity;
   }

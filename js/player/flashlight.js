@@ -3,6 +3,7 @@ import {
   FLASHLIGHT_ANGLE, FLASHLIGHT_PENUMBRA, FLASHLIGHT_DISTANCE,
   FLASHLIGHT_INTENSITY, FLASHLIGHT_COLOR,
 } from '../core/constants.js';
+import { keybindings } from '../core/keybindings.js';
 
 export class Flashlight {
   constructor(game, parent) {
@@ -48,7 +49,7 @@ export class Flashlight {
 
   update(input, dt) {
     // Toggle on F key
-    if (input.isKeyPressed('KeyF')) {
+    if (input.isKeyPressed(keybindings.getKey('flashlight'))) {
       this.toggle();
     }
 

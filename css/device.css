@@ -6,7 +6,7 @@
   transform: translate(-50%, -50%);
   width: 80vw;
   max-width: 700px;
-  height: 72vh;
+  aspect-ratio: 3 / 2;
   z-index: 100;
   pointer-events: auto;
   display: none;
@@ -14,23 +14,27 @@
 
 #device-container.device-visible {
   display: block;
-  animation: deviceOpen 0.25s ease-out forwards;
+  animation: deviceOpen 0.3s ease-out forwards;
 }
 
 #device-container.device-hidden {
   display: block;
-  animation: deviceClose 0.15s ease-in forwards;
+  animation: deviceClose 0.2s ease-in forwards;
   pointer-events: none;
 }
 
+/* CRT power-on: scanline → expand vertically */
 @keyframes deviceOpen {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.92) translateY(25px); }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) translateY(0); }
+  0%   { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(49.5% 0 49.5% 0); }
+  40%  { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(49.5% 0 49.5% 0); }
+  100% { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(0 0 0 0); }
 }
 
+/* CRT power-off: collapse vertically → scanline → gone */
 @keyframes deviceClose {
-  from { opacity: 1; transform: translate(-50%, -50%) scale(1) translateY(0); }
-  to   { opacity: 0; transform: translate(-50%, -50%) scale(0.92) translateY(25px); }
+  0%   { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(0 0 0 0); }
+  60%  { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(49.5% 0 49.5% 0); }
+  100% { opacity: 0; transform: translate(-50%, -50%); clip-path: inset(49.5% 0 49.5% 0); }
 }
 
 /* === DEVICE FRAME (CRT body) === */
@@ -113,6 +117,16 @@
 .device-clock {
   font-size: 8px;
   color: #00aa2a;
+}
+
+.device-battery {
+  font-size: 7px;
+  color: #00aa2a;
+}
+
+.device-battery.battery-low {
+  color: #ff4444;
+  animation: blink 1s infinite;
 }
 
 /* === TABS === */
@@ -227,6 +241,21 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.tama-habitat-canvas {
+  display: block;
+  width: 100%;
+  border: 1px solid #1a3a1a;
+  image-rendering: pixelated;
+  background: #0a0f0a;
+}
+
+.tama-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .tama-sprite-area {
@@ -506,6 +535,38 @@
   color: #00ff41;
 }
 
+.control-row.rebindable {
+  cursor: pointer;
+  padding: 5px 4px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.control-row.rebindable:hover {
+  border-color: #1a3a1a;
+}
+
+.control-row.rebinding {
+  border-color: #00ff41;
+  background: rgba(0, 255, 65, 0.05);
+}
+
+.control-row.rebinding .control-key {
+  animation: blink 0.5s infinite;
+}
+
+/* === SCREEN BACKDROP (mouse clamping) === */
+.screen-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  cursor: none;
+}
+
+.screen-backdrop.task-backdrop {
+  z-index: 199;
+}
+
 /* === TASK OVERLAY === */
 .task-overlay {
   position: fixed;
@@ -522,7 +583,14 @@
   box-shadow:
     0 0 30px rgba(0, 255, 65, 0.1),
     inset 0 0 40px rgba(0, 0, 0, 0.4);
-  min-width: 300px;
+  width: 80vw;
+  max-width: 700px;
+  aspect-ratio: 3 / 2;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .task-overlay canvas {
@@ -530,6 +598,9 @@
   border: 1px solid #1a3a1a;
   image-rendering: pixelated;
   cursor: crosshair;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
 }
 
 .task-overlay .task-title {
@@ -575,9 +646,9 @@
 }
 
 .task-key-prompt {
-  font-size: 28px;
+  font-size: 20px;
   text-align: center;
-  padding: 20px;
+  padding: 12px;
   border: 2px solid #1a3a1a;
   margin: 12px 0;
   text-shadow: 0 0 16px rgba(0, 255, 65, 0.6);
@@ -606,6 +677,113 @@
 .task-dot.error {
   background: #ff3333;
   box-shadow: 0 0 6px rgba(255, 51, 51, 0.5);
+}
+
+/* === BRIEFING SCREEN === */
+.device-briefing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 20px;
+  text-align: center;
+  padding: 20px;
+}
+
+.briefing-title {
+  font-size: 16px;
+  color: #00ff41;
+  text-shadow: 0 0 12px rgba(0, 255, 65, 0.6);
+  letter-spacing: 4px;
+}
+
+.briefing-body {
+  font-size: 8px;
+  color: #00aa2a;
+  line-height: 2;
+  max-width: 400px;
+}
+
+.briefing-btn {
+  padding: 12px 32px;
+  background: #0a1a0a;
+  border: 2px solid #00ff41;
+  color: #00ff41;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  cursor: pointer;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+  transition: background 0.15s, box-shadow 0.15s;
+  margin-top: 12px;
+}
+
+.briefing-btn:hover {
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow: 0 0 16px rgba(0, 255, 65, 0.3);
+}
+
+.briefing-btn:active {
+  background: rgba(0, 255, 65, 0.2);
+}
+
+/* === SOFTWARE CURSOR === */
+#software-cursor {
+  position: fixed;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 10000;
+  display: none;
+  transform: translate(-50%, -50%);
+}
+
+#software-cursor.active {
+  display: block;
+}
+
+#software-cursor::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  width: 2px; height: 100%;
+  background: #00ff41;
+  transform: translateX(-50%);
+  box-shadow: 0 0 4px rgba(0, 255, 65, 0.6);
+}
+
+#software-cursor::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  width: 100%; height: 2px;
+  background: #00ff41;
+  transform: translateY(-50%);
+  box-shadow: 0 0 4px rgba(0, 255, 65, 0.6);
+}
+
+/* === SOFTWARE CURSOR HOVER STATES === */
+.device-tab.sc-hover {
+  color: #00ff41;
+}
+
+.tama-list-item.sc-hover {
+  border-color: #00ff41;
+  color: #00ff41;
+}
+
+.tama-btn.sc-hover {
+  background: rgba(0, 255, 65, 0.1);
+  border-color: #00ff41;
+}
+
+.briefing-btn.sc-hover {
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow: 0 0 16px rgba(0, 255, 65, 0.3);
+}
+
+.control-row.rebindable.sc-hover {
+  border-color: #1a3a1a;
 }
 
 /* === SHARED === */

@@ -3,9 +3,11 @@ import {
   PLAYER_SPEED, PLAYER_SPRINT_MULTIPLIER, PLAYER_JUMP_FORCE, PLAYER_GRAVITY,
   PLAYER_STAND_HEIGHT, PLAYER_CROUCH_HEIGHT, PLAYER_CROUCH_SPEED_MULTIPLIER,
   PLAYER_CART_SPEED_MULTIPLIER, PLAYER_ACCELERATION, PLAYER_DECELERATION,
+  PLAYER_MAX_STAMINA, PLAYER_STAMINA_DRAIN, PLAYER_STAMINA_REGEN, PLAYER_STAMINA_REGEN_DELAY,
   MOUSE_SENSITIVITY, PITCH_MIN, PITCH_MAX,
 } from '../core/constants.js';
 import { dampedLerp, clamp } from '../utils/math-utils.js';
+import { keybindings } from '../core/keybindings.js';
 import { CameraEffects } from './camera-effects.js';
 import { Flashlight } from './flashlight.js';
 import { Interaction } from './interaction.js';
@@ -38,9 +40,19 @@ export class PlayerController {
     this._targetHeight = PLAYER_STAND_HEIGHT;
     this._moveSpeed = 0;
 
+    // Stamina
+    this._stamina = PLAYER_MAX_STAMINA;
+    this._staminaRegenDelay = 0;
+
+    // Exhaustion vignette overlay
+    this._exhaustOverlay = document.createElement('div');
+    this._exhaustOverlay.id = 'exhaust-overlay';
+    document.getElementById('ui-root').appendChild(this._exhaustOverlay);
+
     // Flags for other systems
     this.deviceOpen = false;
     this.isPushingCart = false;
+    this.isCarryingItem = false;
     this.movementEnabled = true;
     this.mouseLookEnabled = true;
 
@@ -72,6 +84,10 @@ export class PlayerController {
     return this._isCrouching;
   }
 
+  get stamina() {
+    return this._stamina;
+  }
+
   update(dt) {
     this._handleMouseLook(dt);
     this._handleMovement(dt);
@@ -82,7 +98,7 @@ export class PlayerController {
 
     this.cameraEffects.update(dt, this._moveSpeed, this._isSprinting, this._isCrouching, this._isGrounded);
     this.flashlight.update(this.input, dt);
-    this.interaction.update();
+    this.interaction.update(dt);
   }
 
   _handleMouseLook(dt) {
@@ -104,10 +120,10 @@ export class PlayerController {
 
     // Build input direction
     const inputDir = new THREE.Vector3();
-    if (this.input.isKeyDown('KeyW') || this.input.isKeyDown('ArrowUp')) inputDir.z -= 1;
-    if (this.input.isKeyDown('KeyS') || this.input.isKeyDown('ArrowDown')) inputDir.z += 1;
-    if (this.input.isKeyDown('KeyA') || this.input.isKeyDown('ArrowLeft')) inputDir.x -= 1;
-    if (this.input.isKeyDown('KeyD') || this.input.isKeyDown('ArrowRight')) inputDir.x += 1;
+    if (this.input.isKeyDown(keybindings.getKey('move_forward')) || this.input.isKeyDown('ArrowUp')) inputDir.z -= 1;
+    if (this.input.isKeyDown(keybindings.getKey('move_back')) || this.input.isKeyDown('ArrowDown')) inputDir.z += 1;
+    if (this.input.isKeyDown(keybindings.getKey('move_left')) || this.input.isKeyDown('ArrowLeft')) inputDir.x -= 1;
+    if (this.input.isKeyDown(keybindings.getKey('move_right')) || this.input.isKeyDown('ArrowRight')) inputDir.x += 1;
 
     if (inputDir.lengthSq() > 0) {
       inputDir.normalize();
@@ -116,15 +132,37 @@ export class PlayerController {
     // Transform to world space (based on yaw only)
     inputDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw.rotation.y);
 
-    // Sprint check
-    this._isSprinting = this.input.isKeyDown('ShiftLeft') || this.input.isKeyDown('ShiftRight');
-    if (this._isCrouching || this.isPushingCart) this._isSprinting = false;
+    // Sprint check (can't sprint with device open)
+    const sprintKey = keybindings.getKey('sprint');
+    const wantsSprint = this.input.isKeyDown(sprintKey) || this.input.isKeyDown('ShiftRight');
+    this._isSprinting = wantsSprint && !this._isCrouching && !this.isPushingCart && !this.deviceOpen && this._stamina > 0;
+
+    // Stamina drain/regen
+    if (this._isSprinting && inputDir.lengthSq() > 0) {
+      this._stamina = Math.max(0, this._stamina - PLAYER_STAMINA_DRAIN * dt);
+      this._staminaRegenDelay = PLAYER_STAMINA_REGEN_DELAY;
+      if (this._stamina <= 0) this._isSprinting = false;
+    } else {
+      this._staminaRegenDelay = Math.max(0, this._staminaRegenDelay - dt);
+      if (this._staminaRegenDelay <= 0) {
+        this._stamina = Math.min(PLAYER_MAX_STAMINA, this._stamina + PLAYER_STAMINA_REGEN * dt);
+      }
+    }
+
+    // Exhaustion vignette
+    const exhaustion = 1 - (this._stamina / PLAYER_MAX_STAMINA);
+    if (exhaustion > 0.5) {
+      this._exhaustOverlay.style.opacity = (exhaustion - 0.5) * 2;
+    } else {
+      this._exhaustOverlay.style.opacity = 0;
+    }
 
     // Calculate target speed
     let targetSpeed = PLAYER_SPEED;
     if (this._isSprinting) targetSpeed *= PLAYER_SPRINT_MULTIPLIER;
     if (this._isCrouching) targetSpeed *= PLAYER_CROUCH_SPEED_MULTIPLIER;
     if (this.isPushingCart) targetSpeed *= PLAYER_CART_SPEED_MULTIPLIER;
+    if (this.deviceOpen) targetSpeed *= PLAYER_CROUCH_SPEED_MULTIPLIER;
 
     // Accelerate/decelerate
     const targetVelocity = inputDir.multiplyScalar(targetSpeed);
@@ -148,8 +186,10 @@ export class PlayerController {
   }
 
   _handleCrouch(dt) {
-    const wantsCrouch = this.input.isKeyDown('ControlLeft') || this.input.isKeyDown('ControlRight') || this.input.isKeyDown('KeyC');
-    this._isCrouching = wantsCrouch;
+    if (this.input.isKeyPressed(keybindings.getKey('crouch'))) {
+      this._isCrouching = !this._isCrouching;
+    }
+    if (this._isSprinting) this._isCrouching = false;
     this._targetHeight = this._isCrouching ? PLAYER_CROUCH_HEIGHT : PLAYER_STAND_HEIGHT;
   }
 
@@ -157,7 +197,7 @@ export class PlayerController {
     if (!this._isGrounded) return;
     if (this._isCrouching) return;
 
-    if (this.input.isKeyPressed('Space')) {
+    if (this.input.isKeyPressed(keybindings.getKey('jump'))) {
       this._verticalVelocity = PLAYER_JUMP_FORCE;
       this._isGrounded = false;
       this.cameraEffects.onJump();

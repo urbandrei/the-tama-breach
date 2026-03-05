@@ -1,12 +1,9 @@
 import * as THREE from 'three';
 import { GameState } from '../core/constants.js';
-import { BillboardSprite } from '../sprites/billboard-sprite.js';
 import { clamp } from '../utils/math-utils.js';
 
 const HIGHLIGHT_FADE_FAR = 15;  // fully invisible beyond this
 const HIGHLIGHT_FADE_NEAR = 5;  // fully visible within this
-const HIGHLIGHT_PULSE_SPEED = 3;
-const WIREFRAME_SPIN_SPEED = 0.5;
 
 export const TaskState = Object.freeze({
   PENDING: 'pending',
@@ -32,103 +29,150 @@ export class TaskBase {
     this._escHandler = null;
 
     // Highlight visuals
-    this._highlightBillboard = null;
-    this._wireframe = null;
-    this._wireframeMat = null;
+    this._highlightMeshes = [];
+    this._highlightEdges = [];
     this._highlightTimer = 0;
+    this._interactableMeshes = [];  // prop meshes registered as interactables
+    this._propWorldPos = null;
   }
 
   placeTrigger() {
-    if (this._triggerMesh) return;
-
-    const geo = new THREE.BoxGeometry(0.8, 1.6, 0.8);
-    const mat = new THREE.MeshBasicMaterial({ visible: false });
-    this._triggerMesh = new THREE.Mesh(geo, mat);
+    if (this._triggerMesh || this._interactableMeshes.length > 0) return;
 
     const [x, y, z] = this.triggerPosition;
-    this._triggerMesh.position.set(x, y, z);
-
-    this._triggerMesh.userData.interactable = {
+    const interactData = {
       promptText: `[E] ${this.title}`,
       interact: () => this.start(),
     };
 
-    this.game.scene.add(this._triggerMesh);
-    this.game.player.interaction.addInteractable(this._triggerMesh);
-
     this._createHighlight(x, y, z);
+
+    const self = this;
+    const checkCondition = () => self.shouldShowOnMap();
+
+    // If highlight found prop meshes, use them as interactables directly
+    if (this._highlightMeshes.length > 0) {
+      for (const entry of this._highlightMeshes) {
+        entry.mesh.userData.interactable = interactData;
+        entry.mesh.userData._checkCondition = checkCondition;
+        this.game.player.interaction.addInteractable(entry.mesh);
+        this._interactableMeshes.push(entry.mesh);
+      }
+    } else {
+      // Fallback: invisible trigger box when no props nearby
+      const geo = new THREE.BoxGeometry(0.8, 1.6, 0.8);
+      const mat = new THREE.MeshBasicMaterial({ visible: false });
+      this._triggerMesh = new THREE.Mesh(geo, mat);
+      this._triggerMesh.position.set(x, y, z);
+      this._triggerMesh.userData.interactable = interactData;
+      this._triggerMesh.userData._checkCondition = checkCondition;
+      this.game.scene.add(this._triggerMesh);
+      this.game.player.interaction.addInteractable(this._triggerMesh);
+    }
   }
 
   _createHighlight(x, y, z) {
-    // ASCII billboard marker floating above trigger
-    this._highlightBillboard = new BillboardSprite(['[!]'], '#00ff41');
-    this._highlightBillboard.sprite.scale.multiplyScalar(0.5);
-    this._highlightBillboard.sprite.material.opacity = 0;
-    this._highlightBillboard.setPosition(x, y + 1.2, z);
-    this._highlightBillboard.addTo(this.game.scene);
+    const roomProps = this.game.facility && this.game.facility.roomProps[this.roomId];
+    if (!roomProps || roomProps.length === 0) return;
 
-    // Wireframe outline around trigger area
-    const wireGeo = new THREE.BoxGeometry(0.8, 1.6, 0.8);
-    const edges = new THREE.EdgesGeometry(wireGeo);
-    this._wireframeMat = new THREE.LineBasicMaterial({
-      color: 0x00ff41,
-      transparent: true,
-      opacity: 0,
+    // Find nearest prop group to trigger position
+    let nearest = null;
+    let nearestDist = Infinity;
+    const _pos = new THREE.Vector3();
+    for (const group of roomProps) {
+      group.getWorldPosition(_pos);
+      const dx = _pos.x - x;
+      const dz = _pos.z - z;
+      const d = dx * dx + dz * dz;
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = group;
+      }
+    }
+    if (!nearest) return;
+
+    // Store prop world position for minimap dots
+    nearest.getWorldPosition(_pos);
+    this._propWorldPos = { x: _pos.x, z: _pos.z };
+
+    // Clone materials on visible meshes for green glow + add edge lines
+    nearest.traverse((child) => {
+      if (!child.isMesh) return;
+      if (!child.material || !child.material.visible) return;
+      const originalMat = child.material;
+      const cloned = originalMat.clone();
+      this._highlightMeshes.push({ mesh: child, originalMat });
+      child.material = cloned;
+
+      // Green edge lines on each mesh
+      const edgesGeo = new THREE.EdgesGeometry(child.geometry);
+      const edgesMat = new THREE.LineBasicMaterial({
+        color: 0x00ff41,
+        transparent: true,
+        opacity: 0,
+      });
+      const lines = new THREE.LineSegments(edgesGeo, edgesMat);
+      lines.raycast = () => {}; // non-interactive
+      child.add(lines);
+      this._highlightEdges.push(lines);
     });
-    this._wireframe = new THREE.LineSegments(edges, this._wireframeMat);
-    this._wireframe.position.set(x, y, z);
-    this._wireframe.frustumCulled = false;
-    this.game.scene.add(this._wireframe);
   }
 
   _removeHighlight() {
-    if (this._highlightBillboard) {
-      this._highlightBillboard.removeFromParent();
-      this._highlightBillboard.dispose();
-      this._highlightBillboard = null;
+    for (const lines of this._highlightEdges) {
+      lines.parent.remove(lines);
+      lines.geometry.dispose();
+      lines.material.dispose();
     }
-    if (this._wireframe) {
-      this.game.scene.remove(this._wireframe);
-      this._wireframe.geometry.dispose();
-      this._wireframeMat.dispose();
-      this._wireframe = null;
-      this._wireframeMat = null;
+    this._highlightEdges = [];
+    for (const entry of this._highlightMeshes) {
+      entry.mesh.material.dispose();
+      entry.mesh.material = entry.originalMat;
     }
+    this._highlightMeshes = [];
   }
 
   updateHighlight(dt, playerPos) {
-    if (!this._highlightBillboard || !this._wireframe) return;
+    if (this._highlightMeshes.length === 0) return;
 
     this._highlightTimer += dt;
 
     // Distance-based fade
-    const [tx, ty, tz] = this.triggerPosition;
+    const [tx, , tz] = this.triggerPosition;
     const dx = tx - playerPos.x;
     const dz = tz - playerPos.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
     const fade = clamp((HIGHLIGHT_FADE_FAR - dist) / (HIGHLIGHT_FADE_FAR - HIGHLIGHT_FADE_NEAR), 0, 1);
 
-    // Breathing pulse
-    const pulse = 0.5 + 0.5 * Math.sin(this._highlightTimer * HIGHLIGHT_PULSE_SPEED);
+    // Subtle green emissive tint (keeps original colors)
+    for (const entry of this._highlightMeshes) {
+      if (!entry.mesh.material.emissive) continue;
+      entry.mesh.material.emissive.setHex(0x00ff41);
+      entry.mesh.material.emissiveIntensity = 0.15 * fade;
+    }
 
-    // Apply to billboard
-    const billboardOpacity = fade * pulse;
-    this._highlightBillboard.sprite.material.opacity = billboardOpacity;
-    this._highlightBillboard.update(dt);
-
-    // Apply to wireframe
-    this._wireframeMat.opacity = fade * pulse * 0.7;
-    this._wireframe.rotation.y += WIREFRAME_SPIN_SPEED * dt;
+    // Edge lines
+    for (const lines of this._highlightEdges) {
+      lines.material.opacity = 0.6 * fade;
+    }
   }
 
   removeTrigger() {
-    if (!this._triggerMesh) return;
+    // Remove prop-based interactables
+    for (const mesh of this._interactableMeshes) {
+      delete mesh.userData.interactable;
+      this.game.player.interaction.removeInteractable(mesh);
+    }
+    this._interactableMeshes = [];
 
-    this.game.player.interaction.removeInteractable(this._triggerMesh);
-    this.game.scene.remove(this._triggerMesh);
-    this._triggerMesh.geometry.dispose();
-    this._triggerMesh.material.dispose();
-    this._triggerMesh = null;
+    // Remove fallback invisible trigger
+    if (this._triggerMesh) {
+      this.game.player.interaction.removeInteractable(this._triggerMesh);
+      this.game.scene.remove(this._triggerMesh);
+      this._triggerMesh.geometry.dispose();
+      this._triggerMesh.material.dispose();
+      this._triggerMesh = null;
+    }
 
     this._removeHighlight();
   }
@@ -176,6 +220,27 @@ export class TaskBase {
     // Override in subclasses
   }
 
+  shouldShowOnMap() {
+    if (this.state === 'active') return true;
+
+    // While carrying: hide non-active tasks (only destination matters)
+    if (this.game.player.isCarryingItem) return false;
+
+    // During breach: only show repair + infra tasks
+    const cm = this.game.creatureManager;
+    if (cm && cm.creatures.size > 0) {
+      let breachActive = false;
+      for (const [, c] of cm.creatures) {
+        if (!c.returned) { breachActive = true; break; }
+      }
+      if (breachActive) {
+        return this.id.startsWith('repair_') || this.id.startsWith('infra_repair_');
+      }
+    }
+
+    return true;
+  }
+
   getTaskData() {
     return {
       id: this.id,
@@ -184,13 +249,13 @@ export class TaskBase {
       status: this.state,
       roomId: this.roomId,
       triggerPosition: this.triggerPosition,
+      propWorldPos: this._propWorldPos,
     };
   }
 
   _freezePlayer() {
     this.game.player.movementEnabled = false;
     this.game.player.mouseLookEnabled = false;
-    this.game.input.releasePointerLock();
 
     const prompt = document.getElementById('interact-prompt');
     if (prompt) prompt.classList.remove('visible');
@@ -199,12 +264,23 @@ export class TaskBase {
   _unfreezePlayer() {
     this.game.player.movementEnabled = true;
     this.game.player.mouseLookEnabled = true;
-    this.game.state = GameState.PLAYING;
-    this.game.input.requestPointerLock();
+    if (this.game.state === GameState.TASK_ACTIVE) {
+      this.game.state = GameState.PLAYING;
+    }
+
+    // Deactivate software cursor (task screen closing)
+    if (this.game.softwareCursor) {
+      this.game.softwareCursor.deactivate();
+    }
   }
 
   _createOverlay() {
     if (this._overlay) return;
+
+    // Backdrop captures clicks outside the task screen
+    this._backdrop = document.createElement('div');
+    this._backdrop.className = 'screen-backdrop task-backdrop';
+    document.getElementById('ui-root').appendChild(this._backdrop);
 
     const overlay = document.createElement('div');
     overlay.className = 'task-overlay';
@@ -213,6 +289,11 @@ export class TaskBase {
     this._buildUI(overlay);
 
     document.getElementById('ui-root').appendChild(overlay);
+
+    // Activate software cursor if pointer lock is active (keeps cursor confined to task screen)
+    if (this.game.softwareCursor && this.game.input.isPointerLocked) {
+      this.game.softwareCursor.activate(overlay);
+    }
 
     // ESC to abort
     this._escHandler = (e) => {
@@ -228,6 +309,11 @@ export class TaskBase {
     if (this._escHandler) {
       document.removeEventListener('keydown', this._escHandler);
       this._escHandler = null;
+    }
+
+    if (this._backdrop) {
+      this._backdrop.remove();
+      this._backdrop = null;
     }
 
     if (this._overlay) {

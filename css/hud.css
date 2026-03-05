@@ -35,3 +35,73 @@
   text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
   line-height: 1;
 }
+
+/* Night clock */
+#night-clock {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #00ff41;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 255, 65, 0.15);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#night-clock.visible {
+  opacity: 1;
+}
+
+/* Notification flash */
+#hud-notification {
+  position: fixed;
+  top: 40px;
+  right: 20px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 6px 14px;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+#hud-notification.visible {
+  opacity: 1;
+}
+
+#hud-notification.warn {
+  color: #ff4444;
+  text-shadow: 0 0 8px rgba(255, 68, 68, 0.5);
+  background: rgba(40, 0, 0, 0.6);
+  border: 1px solid rgba(255, 68, 68, 0.25);
+}
+
+#hud-notification.ok {
+  color: #00ff41;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+  background: rgba(0, 20, 0, 0.6);
+  border: 1px solid rgba(0, 255, 65, 0.2);
+}
+
+/* HUD Minimap */
+#hud-minimap {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 15;
+  pointer-events: none;
+}
+
+#hud-minimap canvas {
+  display: block;
+  image-rendering: pixelated;
+}

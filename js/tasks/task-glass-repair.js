@@ -38,7 +38,7 @@ export class TaskGlassRepair extends TaskBase {
 
     // Glass ASCII art
     this._glassArt = document.createElement('pre');
-    this._glassArt.style.cssText = 'text-align:center;font-size:14px;padding:12px;border:1px solid #1a3a1a;color:#ff3333;text-shadow:0 0 8px rgba(255,51,51,0.4);margin:8px 0;';
+    this._glassArt.style.cssText = 'text-align:center;font-size:10px;padding:8px;border:1px solid #1a3a1a;color:#ff3333;text-shadow:0 0 8px rgba(255,51,51,0.4);margin:8px 0;';
     this._glassArt.textContent = GLASS_ASCII.join('\n');
     container.appendChild(this._glassArt);
 
@@ -61,7 +61,7 @@ export class TaskGlassRepair extends TaskBase {
     const instruction = document.createElement('div');
     instruction.className = 'task-hint';
     instruction.style.fontSize = '8px';
-    instruction.style.marginTop = '12px';
+    instruction.style.marginTop = '8px';
     instruction.textContent = 'CLICK RAPIDLY TO REPAIR';
     container.appendChild(instruction);
 
@@ -113,13 +113,17 @@ export class TaskGlassRepair extends TaskBase {
 
     // Check completion
     if (this._progress >= 100) {
-      // Repair the containment glass
+      // Repair containment and recapture
       const mgr = this.game.tamagotchiManager;
       if (mgr) {
         const tama = mgr.getTama(this._tamaId);
-        if (tama && tama.containment) {
-          tama.containment.repair();
+        if (tama) {
+          tama.reset(); // restores to CONTAINED, repairs glass, resets needs, re-adds sprite
         }
+      }
+      // Despawn the roaming creature
+      if (this.game.creatureManager) {
+        this.game.creatureManager.despawnCreature(this._tamaId);
       }
       this.complete();
     }

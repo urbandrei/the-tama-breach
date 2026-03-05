@@ -1,0 +1,57 @@
+THE TAMA BREACH - FACILITY LAYOUT
+==================================
+
+Legend:  [D] = Doorway    |,-,+ = Walls
+
+            +-------------+-----------------+-----------------+-------------+
+            |             |                 |                 |             |
+            |             |  CONTAINMENT A  |  CONTAINMENT B  |             |
+            |             |      [05]       |      [06]       |             |
+            |             |                 |                 |             |
+            |             +-------[D]-------+-------[D]-------+             |
+            |                         NORTH HALLWAY                         |
++-----------+                                                               +-----------+
+|           |             +-----------------+-----------------+             |           |
+| ELEVATOR  |    WEST    [D]      LAB       | FOOD PROCESSING[D]    EAST    | WATER     |
+|           |    HALL     |      [01]       |      [02]       |    HALL     | FILTRATION|
+|   [11]   [D]            |                 |                 |            [D]   [07]    |
+|           |             |                 |                 |             |           |
++-----------+             +-----------------+-----------------+             +-----------+
+|           |             |                 |                 |             |           |
+| COMMAND   |    WEST    [D]  SERVER ROOM   | GENERATOR ROOM [D]    EAST    | STORAGE   |
+| CENTER    |    HALL     |      [03]       |      [04]       |    HALL     | CLOSET    |
+|   [12]   [D]            |                 |                 |            [D]   [08]    |
+|           |             +-----------------+-----------------+             |           |
++-----------+                                                               +-----------+
+            |                         SOUTH HALLWAY                         |
+            |             +-------[D]-------+-------[D]-------+             |
+            |             |                 |                 |             |
+            |             |  CONTAINMENT C  |  CONTAINMENT D  |             |
+            |             |      [09]       |      [10]       |             |
+            |             |                 |                 |             |
+            +-------------+-----------------+-----------------+-------------+
+
+ROOM INDEX:
+  [01] Lab               - Research and experiments
+  [02] Food Processing   - Tamagotchi food preparation
+  [03] Server Room       - Network infrastructure, climate controlled
+  [04] Generator Room    - Backup power, electrical systems
+  [05] Containment A     - Tamagotchi chamber (Night 1)
+  [06] Containment B     - Tamagotchi chamber (Night 2)
+  [07] Water Filtration  - Pumps and filtration systems
+  [08] Storage Closet    - Supplies, lures, repair kits
+  [09] Containment C     - Tamagotchi chamber (Night 3)
+  [10] Containment D     - Tamagotchi chamber (Night 4)
+  [11] Elevator          - Main entry point, new tamagotchi arrival
+  [12] Command Center    - Central hub, monitoring, camera feeds, alarm controls
+
+NOTES:
+  - Containment rooms are at opposite ends of the cross (North and South arms)
+  - Hallway forms a continuous ring around the 4 center rooms
+  - L-shaped corners connect North/South hallways to East/West hallways
+  - No doors between the 4 center rooms; each opens only to its adjacent hallway
+  - Rooms 1, 3, 7, 8 have doors on the LEFT wall (open to West/East Hall)
+  - Rooms 2, 4, 11, 12 have doors on the RIGHT wall (open to West/East Hall)
+  - West Hall serves rooms 1, 3, 11, 12
+  - East Hall serves rooms 2, 4, 7, 8
+  - Facility is dark with flickering ambient lighting

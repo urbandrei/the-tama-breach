@@ -4,8 +4,6 @@ const KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyE'];
 const KEY_LABELS = { KeyW: 'W', KeyA: 'A', KeyS: 'S', KeyD: 'D', KeyE: 'E' };
 const DEFAULT_KEY_COUNT = 5;
 const DEFAULT_TIME_LIMIT = 8;
-const WRONG_KEY_PENALTY = 0.5;
-
 export class TaskQTE extends TaskBase {
   constructor(game, config) {
     super(game, config);
@@ -57,15 +55,6 @@ export class TaskQTE extends TaskBase {
     }
     container.appendChild(dotsRow);
 
-    // Timer bar
-    const timerBg = document.createElement('div');
-    timerBg.className = 'task-timer-bg';
-    this._timerFill = document.createElement('div');
-    this._timerFill.className = 'task-timer-fill';
-    this._timerFill.style.width = '100%';
-    timerBg.appendChild(this._timerFill);
-    container.appendChild(timerBg);
-
     // Hint
     const hint = document.createElement('div');
     hint.className = 'task-hint';
@@ -75,18 +64,6 @@ export class TaskQTE extends TaskBase {
 
   update(dt) {
     if (this.state !== TaskState.ACTIVE) return;
-
-    // Tick timer
-    this._timeRemaining -= dt;
-    if (this._timerFill) {
-      const pct = Math.max(0, (this._timeRemaining / this._timeLimit) * 100);
-      this._timerFill.style.width = `${pct}%`;
-    }
-
-    if (this._timeRemaining <= 0) {
-      this.fail();
-      return;
-    }
 
     // Check key presses
     const expectedKey = this._sequence[this._currentIndex];
@@ -121,8 +98,6 @@ export class TaskQTE extends TaskBase {
   }
 
   _onWrongKey() {
-    this._timeRemaining -= WRONG_KEY_PENALTY;
-
     if (this._keyPrompt) {
       this._keyPrompt.style.color = '#ff3333';
       clearTimeout(this._flashTimeout);

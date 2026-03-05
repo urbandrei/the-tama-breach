@@ -20,35 +20,95 @@ export class TaskHUD {
     this._container.appendChild(this._textEl);
 
     document.getElementById('ui-root').appendChild(this._container);
+
+    // Night clock display
+    this._clockEl = document.createElement('div');
+    this._clockEl.id = 'night-clock';
+    document.getElementById('ui-root').appendChild(this._clockEl);
+
+    // Notification flash
+    this._notifEl = document.createElement('div');
+    this._notifEl.id = 'hud-notification';
+    document.getElementById('ui-root').appendChild(this._notifEl);
+    this._notifTimer = 0;
+
+    // Listen for infra events
+    game.on('infra:down', (data) => this._showNotification(`${data.label} OFFLINE`, 'warn'));
+    game.on('infra:up', (data) => this._showNotification(`${data.label} ONLINE`, 'ok'));
+  }
+
+  _showNotification(text, type = 'warn') {
+    this._notifEl.textContent = text;
+    this._notifEl.className = `visible ${type}`;
+    this._notifTimer = 3.5;
   }
 
   update(dt) {
+    // Update night clock
+    const nm = this.game.nightManager;
+    if (nm && nm.clock && this.game.state === GameState.PLAYING) {
+      this._clockEl.textContent = nm.clock.getFormattedTime();
+      this._clockEl.classList.add('visible');
+    } else {
+      this._clockEl.classList.remove('visible');
+    }
+
+    // Notification flash timer
+    if (this._notifTimer > 0) {
+      this._notifTimer -= dt;
+      if (this._notifTimer <= 0) {
+        this._notifEl.className = '';
+      }
+    }
+
     // Hide during device open or task active
     if (this.game.state === GameState.DEVICE_OPEN || this.game.state === GameState.TASK_ACTIVE) {
       this._container.classList.remove('visible');
       return;
     }
 
-    // Find next pending or failed task
+    // Find target to point at
     if (!this.game.taskManager) {
       this._container.classList.remove('visible');
       return;
     }
 
-    const tasks = this.game.taskManager.getAllTaskData();
-    const nextTask = tasks.find(t => t.status === 'pending' || t.status === 'failed');
+    let tx, tz, targetLabel;
 
-    if (!nextTask || !nextTask.triggerPosition) {
-      this._container.classList.remove('visible');
-      return;
+    // While pushing cart, point to delivery destination
+    if (this.game.player.isPushingCart) {
+      const transport = this.game.taskManager.tasks['transport_specimen'];
+      if (transport && transport.getTargetInfo) {
+        const info = transport.getTargetInfo();
+        if (info) {
+          tx = info.position[0];
+          tz = info.position[2];
+          targetLabel = info.label;
+        }
+      }
+    }
+
+    // Otherwise point to next pending task
+    if (targetLabel === undefined) {
+      const nextTask = this.game.taskManager._taskList.find(t =>
+        (t.state === 'pending' || t.state === 'failed') && t.shouldShowOnMap()
+      );
+
+      if (!nextTask || !nextTask.triggerPosition) {
+        this._container.classList.remove('visible');
+        return;
+      }
+
+      const mp = nextTask._mapPosition;
+      const pp = nextTask._propWorldPos;
+      tx = mp ? mp.x : (pp ? pp.x : nextTask.triggerPosition[0]);
+      tz = mp ? mp.z : (pp ? pp.z : nextTask.triggerPosition[2]);
+      targetLabel = nextTask.location;
     }
 
     // Show HUD
     this._container.classList.add('visible');
-    this._textEl.textContent = nextTask.location;
-
-    // Use exact trigger position
-    const [tx, _ty, tz] = nextTask.triggerPosition;
+    this._textEl.textContent = targetLabel;
 
     const player = this.game.player;
     const px = player.position.x;

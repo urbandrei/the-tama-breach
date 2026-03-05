@@ -7,7 +7,7 @@ import { PlayerController } from './player/player-controller.js';
 export class Game {
   constructor(canvas) {
     this.canvas = canvas;
-    this.state = GameState.PLAYING;
+    this.state = GameState.MENU;
 
     // Event bus
     this._listeners = {};
@@ -50,6 +50,12 @@ export class Game {
     this.taskManager = null;
     this.deviceManager = null;
     this.taskHUD = null;
+    this.creatureManager = null;
+    this.nightManager = null;
+    this.elevatorManager = null;
+    this.infrastructureManager = null;
+    this.cameraSystem = null;
+    this.dustParticles = null;
 
     // Clock
     this._clock = new THREE.Clock();
@@ -61,7 +67,7 @@ export class Game {
 
     // Pointer lock on click (not while device is open)
     canvas.addEventListener('click', () => {
-      if (!this.input.isPointerLocked && this.state !== GameState.DEVICE_OPEN && this.state !== GameState.TASK_ACTIVE) {
+      if (!this.input.isPointerLocked && this.state === GameState.PLAYING) {
         this.input.requestPointerLock();
       }
     });
@@ -110,6 +116,11 @@ export class Game {
   }
 
   _update(dt) {
+    // Elevator animates during intro, gameplay, and quit ascent (DEATH while ascending)
+    if (this.elevatorManager && (this.state === GameState.NIGHT_INTRO || this.state === GameState.PLAYING || this.state === GameState.DEVICE_OPEN || this.state === GameState.TASK_ACTIVE || this.state === GameState.DEATH)) {
+      this.elevatorManager.update(dt);
+    }
+
     if (this.state === GameState.PLAYING || this.state === GameState.DEVICE_OPEN || this.state === GameState.TASK_ACTIVE) {
       this.player.update(dt);
       if (this.facility) this.facility.update(dt);
@@ -117,7 +128,13 @@ export class Game {
       if (this.lightingManager) this.lightingManager.update(dt);
       if (this.deviceManager) this.deviceManager.update(dt);
       if (this.taskManager) this.taskManager.update(dt);
+      if (this.infrastructureManager) this.infrastructureManager.update(dt);
+      if (this.cameraSystem) this.cameraSystem.update(dt);
+      if (this.creatureManager) this.creatureManager.update(dt);
+      if (this.nightManager) this.nightManager.update(dt);
+      if (this.dustParticles) this.dustParticles.update(dt);
       if (this.taskHUD) this.taskHUD.update(dt);
+      if (this.hudMinimap) this.hudMinimap.update(dt);
     }
   }
 

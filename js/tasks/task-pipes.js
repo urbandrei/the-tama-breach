@@ -1,8 +1,10 @@
 import { TaskBase, TaskState } from './task-base.js';
 
 const GRID_SIZE = 4;
-const CELL_SIZE = 80;
-const CANVAS_SIZE = GRID_SIZE * CELL_SIZE;
+const CELL_W = 120;
+const CELL_H = 80;
+const CANVAS_W = GRID_SIZE * CELL_W;  // 480
+const CANVAS_H = GRID_SIZE * CELL_H;  // 320
 const PIPE_WIDTH = 12;
 const BG_COLOR = '#0a0f0a';
 const PIPE_DIM = '#0a5a2a';
@@ -158,8 +160,8 @@ export class TaskPipes extends TaskBase {
     container.appendChild(title);
 
     this._canvas = document.createElement('canvas');
-    this._canvas.width = CANVAS_SIZE;
-    this._canvas.height = CANVAS_SIZE;
+    this._canvas.width = CANVAS_W;
+    this._canvas.height = CANVAS_H;
     container.appendChild(this._canvas);
     this._ctx = this._canvas.getContext('2d');
 
@@ -178,11 +180,11 @@ export class TaskPipes extends TaskBase {
     if (this.state !== TaskState.ACTIVE) return;
 
     const rect = this._canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (CANVAS_SIZE / rect.width);
-    const my = (e.clientY - rect.top) * (CANVAS_SIZE / rect.height);
+    const mx = (e.clientX - rect.left) * (CANVAS_W / rect.width);
+    const my = (e.clientY - rect.top) * (CANVAS_H / rect.height);
 
-    const col = Math.floor(mx / CELL_SIZE);
-    const row = Math.floor(my / CELL_SIZE);
+    const col = Math.floor(mx / CELL_W);
+    const row = Math.floor(my / CELL_H);
 
     if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return;
 
@@ -201,25 +203,25 @@ export class TaskPipes extends TaskBase {
     if (!ctx) return;
 
     ctx.fillStyle = BG_COLOR;
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
     // Draw grid lines
     ctx.strokeStyle = PIPE_BORDER;
     ctx.lineWidth = 1;
     for (let i = 0; i <= GRID_SIZE; i++) {
       ctx.beginPath();
-      ctx.moveTo(i * CELL_SIZE, 0);
-      ctx.lineTo(i * CELL_SIZE, CANVAS_SIZE);
+      ctx.moveTo(i * CELL_W, 0);
+      ctx.lineTo(i * CELL_W, CANVAS_H);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(0, i * CELL_SIZE);
-      ctx.lineTo(CANVAS_SIZE, i * CELL_SIZE);
+      ctx.moveTo(0, i * CELL_H);
+      ctx.lineTo(CANVAS_W, i * CELL_H);
       ctx.stroke();
     }
 
     // Draw source and sink indicators
-    const srcY = this._sourceRow * CELL_SIZE + CELL_SIZE / 2;
-    const snkY = this._sinkRow * CELL_SIZE + CELL_SIZE / 2;
+    const srcY = this._sourceRow * CELL_H + CELL_H / 2;
+    const snkY = this._sinkRow * CELL_H + CELL_H / 2;
 
     ctx.fillStyle = PIPE_LIT;
     ctx.shadowColor = PIPE_LIT;
@@ -232,9 +234,9 @@ export class TaskPipes extends TaskBase {
     ctx.fill();
     // Sink arrow
     ctx.beginPath();
-    ctx.moveTo(CANVAS_SIZE, snkY - 10);
-    ctx.lineTo(CANVAS_SIZE - 15, snkY);
-    ctx.lineTo(CANVAS_SIZE, snkY + 10);
+    ctx.moveTo(CANVAS_W, snkY - 10);
+    ctx.lineTo(CANVAS_W - 15, snkY);
+    ctx.lineTo(CANVAS_W, snkY + 10);
     ctx.fill();
     ctx.shadowBlur = 0;
 
@@ -247,9 +249,10 @@ export class TaskPipes extends TaskBase {
   }
 
   _drawPipe(ctx, row, col) {
-    const cx = col * CELL_SIZE + CELL_SIZE / 2;
-    const cy = row * CELL_SIZE + CELL_SIZE / 2;
-    const half = CELL_SIZE / 2;
+    const cx = col * CELL_W + CELL_W / 2;
+    const cy = row * CELL_H + CELL_H / 2;
+    const halfW = CELL_W / 2;
+    const halfH = CELL_H / 2;
     const isConnected = this._connected[row][col];
     const color = isConnected ? PIPE_LIT : PIPE_DIM;
     const openDirs = this._getOpenDirections(row, col);
@@ -268,10 +271,10 @@ export class TaskPipes extends TaskBase {
       ctx.beginPath();
       ctx.moveTo(cx, cy);
       switch (dir) {
-        case DIR.UP:    ctx.lineTo(cx, cy - half); break;
-        case DIR.RIGHT: ctx.lineTo(cx + half, cy); break;
-        case DIR.DOWN:  ctx.lineTo(cx, cy + half); break;
-        case DIR.LEFT:  ctx.lineTo(cx - half, cy); break;
+        case DIR.UP:    ctx.lineTo(cx, cy - halfH); break;
+        case DIR.RIGHT: ctx.lineTo(cx + halfW, cy); break;
+        case DIR.DOWN:  ctx.lineTo(cx, cy + halfH); break;
+        case DIR.LEFT:  ctx.lineTo(cx - halfW, cy); break;
       }
       ctx.stroke();
     }

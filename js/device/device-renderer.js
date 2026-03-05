@@ -1,6 +1,5 @@
 import { TamaTab } from './tama-tab.js';
 import { TasksTab } from './tasks-tab.js';
-import { Minimap } from './minimap.js';
 import { SettingsTab } from './settings-tab.js';
 
 export class DeviceRenderer {
@@ -40,7 +39,12 @@ export class DeviceRenderer {
     this._clock.className = 'device-clock';
     this._clock.textContent = '12:00 AM';
 
+    this._batteryEl = document.createElement('span');
+    this._batteryEl.className = 'device-battery';
+    this._batteryEl.textContent = 'BAT 100%';
+
     header.appendChild(title);
+    header.appendChild(this._batteryEl);
     header.appendChild(this._clock);
 
     // Tab bar
@@ -50,7 +54,6 @@ export class DeviceRenderer {
     const tabNames = [
       { key: 'specimens', label: 'SPECIMENS' },
       { key: 'tasks', label: 'TASKS' },
-      { key: 'map', label: 'MAP' },
       { key: 'settings', label: 'SETTINGS' },
     ];
 
@@ -86,7 +89,6 @@ export class DeviceRenderer {
     this._tabs = {
       specimens: new TamaTab(this.game),
       tasks: new TasksTab(this.game),
-      map: new Minimap(this.game),
       settings: new SettingsTab(this.game),
     };
   }
@@ -110,6 +112,13 @@ export class DeviceRenderer {
   }
 
   show() {
+    // Backdrop captures clicks outside device
+    if (!this._backdrop) {
+      this._backdrop = document.createElement('div');
+      this._backdrop.className = 'screen-backdrop';
+      document.getElementById('ui-root').appendChild(this._backdrop);
+    }
+
     this._container.classList.remove('device-hidden');
     this._container.classList.add('device-visible');
 
@@ -126,6 +135,12 @@ export class DeviceRenderer {
       this._activeTab.onDeactivate();
     }
 
+    // Remove backdrop
+    if (this._backdrop) {
+      this._backdrop.remove();
+      this._backdrop = null;
+    }
+
     // After close animation, fully hide
     const onEnd = () => {
       if (!this._container.classList.contains('device-visible')) {
@@ -135,6 +150,56 @@ export class DeviceRenderer {
       this._container.removeEventListener('animationend', onEnd);
     };
     this._container.addEventListener('animationend', onEnd);
+  }
+
+  showBriefing(title, body, buttonText, onAction) {
+    // Show device container
+    this._container.classList.remove('device-hidden');
+    this._container.classList.add('device-visible');
+
+    // Replace content with briefing screen
+    this._content.innerHTML = '';
+    const briefing = document.createElement('div');
+    briefing.className = 'device-briefing';
+    const bodyHtml = body ? `<div class="briefing-body">${body.replace(/\n/g, '<br>')}</div>` : '';
+    briefing.innerHTML = `
+      <div class="briefing-title">${title}</div>
+      ${bodyHtml}
+      <button class="briefing-btn">${buttonText}</button>
+    `;
+    this._content.appendChild(briefing);
+
+    const btn = briefing.querySelector('.briefing-btn');
+    btn.addEventListener('click', onAction, { once: true });
+
+    // Hide tab bar during briefing
+    const tabBar = this._frame.querySelector('#device-tabs');
+    if (tabBar) tabBar.style.display = 'none';
+  }
+
+  hideBriefing() {
+    // Hide device first (before restoring tabs to avoid flash of home screen)
+    this.hide();
+
+    // Restore tab bar and content after close animation
+    const onEnd = () => {
+      const tabBar = this._frame.querySelector('#device-tabs');
+      if (tabBar) tabBar.style.display = '';
+      this._switchTab(this._activeTabName);
+      this._container.removeEventListener('animationend', onEnd);
+    };
+    this._container.addEventListener('animationend', onEnd);
+  }
+
+  updateBattery(level) {
+    if (!this._batteryEl) return;
+    const pct = Math.round(level);
+    this._batteryEl.textContent = `BAT ${pct}%`;
+    if (pct <= 15) {
+      this._batteryEl.classList.add('battery-low');
+    } else {
+      this._batteryEl.classList.remove('battery-low');
+    }
   }
 
   update(dt) {

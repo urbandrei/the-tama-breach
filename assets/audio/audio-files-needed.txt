@@ -1,0 +1,282 @@
+THE TAMA BREACH — Audio Files Manifest
+=======================================
+
+All audio files needed for the game, organized by category.
+Format: OGG or MP3 recommended. Keep files small for web loading.
+
+
+=== MUSIC ===
+
+music/ambient_calm.ogg
+  Calm ambient loop for normal gameplay. Low drone, subtle synth pads.
+  Plays during PLAYING state when no tamas are agitated or escaped.
+
+music/ambient_tense.ogg
+  Tense ambient loop. Darker tone, uneasy undercurrent, subtle heartbeat.
+  Crossfades from calm when a tama becomes agitated or containment is cracking.
+
+music/chase_theme.ogg
+  Intense chase music. Fast tempo, aggressive synth, driving percussion.
+  Crossfades in when an escaped tama enters CHASE state toward player.
+
+music/night_intro.ogg
+  Short sting (3-5s) for night intro screen. Ominous, sets the mood.
+  Plays once when "NIGHT X" overlay appears.
+
+music/night_complete.ogg
+  Short success sting (3-5s). Relief, minor triumph.
+  Plays once when "NIGHT COMPLETE" overlay appears.
+
+music/victory.ogg
+  Longer victory theme (10-15s). Triumph, relief after final night.
+  Plays on "SHIFT COMPLETE" screen after Night 5.
+
+
+=== SFX — PLAYER ===
+
+sfx/footstep_01.ogg
+sfx/footstep_02.ogg
+sfx/footstep_03.ogg
+sfx/footstep_04.ogg
+  Normal walking footsteps on concrete/metal floor. 4 variations to avoid repetition.
+  Synced to head bob cycle during normal movement.
+
+sfx/sprint_footstep_01.ogg
+sfx/sprint_footstep_02.ogg
+sfx/sprint_footstep_03.ogg
+sfx/sprint_footstep_04.ogg
+  Heavier/faster footsteps for sprinting. 4 variations.
+  Synced to head bob cycle during sprint.
+
+sfx/flashlight_click.ogg
+  Click/toggle sound for flashlight on/off. Short, mechanical.
+  Plays on F key press.
+
+sfx/jump.ogg
+  Short effort/whoosh for jumping.
+  Plays on Space key press when grounded.
+
+sfx/land_soft.ogg
+  Soft landing thud for short falls.
+  Plays when player lands from small height.
+
+sfx/land_hard.ogg
+  Heavy landing impact for longer falls.
+  Plays when player lands from significant height.
+
+
+=== SFX — FACILITY ===
+
+sfx/door_open.ogg
+  Pneumatic/sliding door opening. Sci-fi facility feel.
+  Plays when any door begins opening on proximity.
+
+sfx/door_close.ogg
+  Pneumatic/sliding door closing.
+  Plays when door auto-closes after player leaves range.
+
+sfx/glass_crack_01.ogg
+sfx/glass_crack_02.ogg
+  Glass stress/cracking sounds. 2 variations.
+  Plays when containment glass transitions to a new crack stage.
+
+sfx/glass_shatter.ogg
+  Loud glass shattering/explosion.
+  Plays on containment breach (glass health reaches 0).
+
+sfx/blackout_surge.ogg
+  Electrical surge + lights cutting out. Deep thud/buzz.
+  Plays when blackout triggers on containment breach.
+
+sfx/power_flicker.ogg
+  Brief electrical flicker/buzz.
+  Plays during random light flicker events.
+
+
+=== SFX — TAMAGOTCHI ===
+
+sfx/tama_feed.ogg
+  Feeding/eating sound. Cute/organic munch.
+  Plays when player uses FEED action on device.
+
+sfx/tama_play.ogg
+  Happy/playful chime or squeak.
+  Plays when player uses PLAY action on device.
+
+sfx/tama_scold.ogg
+  Stern buzz/beep. Discipline tone.
+  Plays when player uses SCOLD action on device.
+
+sfx/tama_agitated.ogg
+  Unsettling creature vocalization. Grows from unease.
+  Plays when a tama transitions to AGITATED state.
+
+sfx/tama_cry_distant.ogg
+  Distant, muffled creature cry. Eerie and far-off.
+  Plays as ambient scare event during gameplay. Spatial audio from tama position.
+
+sfx/egg_crack.ogg
+  Egg cracking/shifting sound.
+  Plays when egg in chamber transitions to a new crack stage.
+
+sfx/egg_hatch.ogg
+  Egg hatching — shell breaking apart, creature emerging.
+  Plays when egg completes hatching and tama sprite appears.
+
+sfx/nibbles_wander.ogg
+  Nibbles-specific wandering sound. Energetic clicking/chittering. Loud.
+  Spatial audio from Nibbles' position when escaped and wandering.
+
+sfx/void_ambient.ogg
+  Void-specific ambient. Near-silent low hum, unsettling.
+  Spatial audio from Void's position when escaped. Very quiet.
+
+sfx/glitch_teleport.ogg
+  Digital glitch/warp sound for Glitch's teleportation.
+  Plays when Glitch teleports to a new waypoint.
+
+sfx/feral_growl.ogg
+  Aggressive growl/snarl for Feral.
+  Spatial audio from Feral's position when escaped, especially during chase.
+
+
+=== SFX — TASKS ===
+
+sfx/task_complete.ogg
+  Success chime/confirmation tone. Positive, brief.
+  Plays when any task is completed.
+
+sfx/task_fail.ogg
+  Failure buzz/error tone. Negative, brief.
+  Plays when a timed task runs out or fails.
+
+sfx/qte_hit.ogg
+  Correct key press in QTE. Snappy, satisfying click.
+  Plays on each correct input during QTE tasks.
+
+sfx/qte_miss.ogg
+  Wrong key press in QTE. Dull thud or buzz.
+  Plays on wrong input during QTE tasks.
+
+sfx/wire_connect.ogg
+  Wire connecting/snapping into place.
+  Plays when a correct wire pair is matched.
+
+sfx/pipe_rotate.ogg
+  Pipe segment rotating into position. Metallic clunk.
+  Plays when player rotates a pipe segment.
+
+sfx/cart_creak.ogg
+  Cart wheel creaking/rolling. Rhythmic, metallic.
+  Loops while player is pushing the transport cart.
+
+sfx/cart_stop.ogg
+  Cart coming to rest. Brief metallic settling.
+  Plays when cart is parked (Q key) or arrives at destination.
+
+sfx/note_scribble.ogg
+  Pen on paper scribbling.
+  Plays when player selects a radio option in the notes task.
+
+sfx/report_submit.ogg
+  Paper stamp/clipboard snap. Official-sounding.
+  Plays when player submits the observation report.
+
+sfx/glass_repair_tick.ogg
+  Small glass repair sound. Click/seal per repair increment.
+  Plays on each click during glass repair QTE.
+
+
+=== SFX — UI / DEVICE ===
+
+sfx/device_open.ogg
+  Wrist device flipping up. Mechanical with electronic boot-up.
+  Plays when Tab key opens the device.
+
+sfx/device_close.ogg
+  Wrist device closing/lowering. Brief mechanical snap.
+  Plays when Tab key or ESC closes the device.
+
+sfx/device_tab_click.ogg
+  Tab switch click on device. Subtle UI sound.
+  Plays when switching between SPECIMENS/TASKS/SETTINGS tabs.
+
+sfx/interact_prompt.ogg
+  Subtle blip when interact prompt appears. Very quiet.
+  Plays when player looks at an interactable object.
+
+
+=== SFX — DEATH / JUMPSCARE ===
+
+sfx/jumpscare_hit.ogg
+  Loud, sharp scare sting. Jarring burst with creature shriek undertone.
+  Plays at the instant of jumpscare (phase 1: white flash).
+
+sfx/jumpscare_static.ogg
+  TV static/white noise (1s duration).
+  Plays during jumpscare phase 3 (static/glitch).
+
+sfx/death_flatline.ogg
+  Low flatline or fade-out tone.
+  Plays during jumpscare phase 4 (fade to black).
+
+
+=== SFX — LURE / RECAPTURE ===
+
+sfx/lure_pickup.ogg
+  Picking up lure item. Small object grab sound.
+  Plays when player picks up lure from storage.
+
+sfx/lure_place.ogg
+  Placing lure in containment chamber. Setting down with a click.
+  Plays when player places lure to attract escaped tama.
+
+sfx/tama_return.ogg
+  Creature returning to chamber. Calming down, settling in.
+  Plays when escaped tama reaches the lure and enters RETURN state.
+
+sfx/recapture_success.ogg
+  Containment restored confirmation. Satisfying seal/lock sound.
+  Plays when glass repair completes and tama is recaptured.
+
+
+=== AMBIENT ===
+
+ambient/facility_hum.ogg
+  Low electrical hum/drone for the facility. Continuous loop.
+  Plays at low volume throughout gameplay. Spatial in hallways.
+
+ambient/water_drip.ogg
+  Periodic water dripping. Sparse, echoing drops.
+  Spatial audio in Water Filtration room.
+
+ambient/server_buzz.ogg
+  Electronic buzzing/fan noise. Server rack ambience.
+  Spatial audio in Server Room.
+
+ambient/electrical_crackle.ogg
+  Intermittent electrical crackling/arcing.
+  Spatial audio in Electrical Room.
+
+ambient/containment_hum.ogg
+  Low hum from containment equipment. Slightly unsettling.
+  Spatial audio in containment rooms when tama is present.
+
+ambient/vent_whisper.ogg
+  Faint air movement through vents. Barely audible.
+  Sparse spatial audio in hallways for atmosphere.
+
+
+=== RADIO / NARRATIVE ===
+
+sfx/radio_static_in.ogg
+  Radio static burst at start of transmission. Brief crackle.
+  Plays before each supervisor radio message.
+
+sfx/radio_static_out.ogg
+  Radio static fading at end of transmission.
+  Plays after each supervisor radio message.
+
+sfx/note_pickup.ogg
+  Paper rustling. Picking up a collectible note.
+  Plays when player interacts with a lore note in the facility.

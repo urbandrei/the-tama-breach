@@ -1,0 +1,24 @@
+The loading dock should be an elevator. The player starts by going down the elevator, and the door opens.
+When they enter, their should be an indicator that the elevator is going back up, and the door to the room should be locked.
+Nights should last 9-10 minutes long. Tasks should not be preset, they should happen on intervals, and they can stack.
+Instead of food, play, and scold, change to give food, change water, give object.
+When water filtration, food processing is down, thirst and hunger should decrease quicker, when they are up it should be much slower.
+When water is changed, it fills a container in their room. While there is water, their thirst should go up. If there is no water, their thirst will go down. Thirst goes up faster than goes down.
+When the server is down, you can't remotely use the tamagatchi buttons.
+You will occasionally need to return the device to the command center to charge it. During that time, you will need to take care of the tamagatchi without it.
+There should be a way to change the water, give food, and play with tamagatchi in their room.
+If the generator goes down, the lights should go out, and the tamagatchi will panic and their hunger, thirst, and happiness go down rapidly.
+Every room should have security cameras, and they should go out periodically, and need to be repaired. When security cameras are up, you can see if a tamagatchi is in that room on your device.
+If the security camera in a tamagatchi room is down, you should not be able to see the tamagatchi image on device.
+Instead of bars showing stats, their should be elements like toys and water bowl and food on an image on the device, that can be interpretted to see their needs. The tamatchi should also have speech bubbles that show if they want something or if they are happy or sad.
+Device and minigames should be same size, and mouse should be clamped to the screen. When opening or closing device, it should start from a scan line and scale to the correct size, like an old television.
+Start menu and day instructions should be on the device, and when you click start, you look up and the elevator reaches the bottom and the doors open. The elevator should be a long shaft up with heavy fog.
+On the device, their should be hotkeys for commands that are clearly seen. In the settings, you should be able to adjust hotkeys.
+Their should be dust in the air, which interacts with the lights, especially in the dark.
+New tamagatchi and items should come from the elevator. In the first 4 nights, new tamagatchi should come in around minute 2, and hatch around minute 4.
+When tamagotchi get upset, they bang on the glass. Even after they are placated, the glass should remain damaged. Players can go back to the room to repair the glass.
+Tamagatchi will occasionally bang on the glass for no reason. You will have to go to the room and fix the glass while they bang on it. After a little bit, they will calm down. If players visit the room, the chance of this happening drops.
+Jumping should have lower height.
+Running should lower a stamina bar, that is replenished by not running.
+Change crouch to c, and have it toggleable.
+If a tamagotchi is left in cart, it can hatch, and if it hatches in the cart, it will automatically start an escape.

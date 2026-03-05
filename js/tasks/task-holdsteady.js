@@ -5,7 +5,6 @@ const CANVAS_W = 400;
 const CANVAS_H = 300;
 const TARGET_RADIUS = 40;
 const DEFAULT_DURATION = 5;
-const DRAIN_RATE = 0.5; // multiplier of fill rate when outside target
 const BG_COLOR = '#0a0f0a';
 const TARGET_COLOR = '#00ff41';
 const TARGET_DIM = '#0a5a2a';
@@ -93,12 +92,10 @@ export class TaskHoldSteady extends TaskBase {
     const dist = Math.sqrt(dx * dx + dy * dy);
     const inside = dist <= TARGET_RADIUS;
 
-    // Update progress
-    const fillRate = 1 / this._duration;
+    // Update progress (accumulate only when inside, no drain)
     if (inside) {
+      const fillRate = 1 / this._duration;
       this._progress += fillRate * dt;
-    } else {
-      this._progress -= fillRate * DRAIN_RATE * dt;
     }
     this._progress = clamp(this._progress, 0, 1);
 

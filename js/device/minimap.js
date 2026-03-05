@@ -1,10 +1,10 @@
 import { rooms, hallways, HALLWAY_WIDTH } from '../facility/layout-data.js';
 
 // World bounds (with padding)
-const WORLD_MIN_X = -40;
-const WORLD_MAX_X = 40;
-const WORLD_MIN_Z = -46;
-const WORLD_MAX_Z = 48;
+const WORLD_MIN_X = -27;
+const WORLD_MAX_X = 27;
+const WORLD_MIN_Z = -27;
+const WORLD_MAX_Z = 27;
 const WORLD_W = WORLD_MAX_X - WORLD_MIN_X;
 const WORLD_H = WORLD_MAX_Z - WORLD_MIN_Z;
 

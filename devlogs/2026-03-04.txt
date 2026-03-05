@@ -1,0 +1,284 @@
+Title: Full facility rebuild - cross layout
+TL;DR: Completely redesigned the facility into a cross shape with a hallway ring, 12 rooms, and better navigation.
+---
+- New cross-shaped facility layout: 4 center rooms surrounded by a hallway ring, side wings with utility rooms, and containment rooms in north/south arms
+- Wider hallways for easier navigation
+- Room signs now stick out into the hallway above doors like blade signs, readable from both directions
+- Doors staggered along hallways so no two are directly across from each other
+- Player now spawns in the elevator facing east
+
+Title: Movement overhaul - stamina, crouch toggle, lower jump
+TL;DR: Reworked player movement: lower jump height, C toggles crouch, and stamina drains when sprinting with a subtle exhaustion vignette.
+---
+- Jump force reduced from 8 to 5 (much more grounded, ~0.6 unit hop instead of ~1.6)
+- Crouch is now a toggle on C key instead of hold-to-crouch on Ctrl/C. Auto-uncrouches when sprinting.
+- Added stamina system: drains at 20/s while sprinting, regens at 15/s after 1s delay
+- No stamina bar — instead, a dark vignette creeps in from screen edges when stamina drops below 50% (follows existing overlay pattern from proximity.css)
+- Stamina hitting 0 forces sprint off until it regenerates
+
+Title: Needs system rework - thirst, water containers, consumables
+TL;DR: Replaced discipline with thirst + water container mechanic. Tamas now need food, water changes, and toys.
+---
+- Replaced the 3-need system: hunger/happiness/discipline → hunger/thirst/happiness
+- Actions changed: FEED/PLAY/SCOLD → FEED/WATER/PLAY
+- New water container mechanic: each tama room has a water container (0-100). While water exists, thirst recovers. When empty, thirst decays. WATER action refills container to 100.
+- Thirst fills faster than it decays (asymmetric — rewards proactive water changes)
+- Added infrastructure hooks: hungerDecayMultiplier, thirstDecayMultiplier, panicMode (for future phases)
+- Updated all 4 personalities: Nibbles prefers FEED, Void/Feral prefer WATER, Glitch prefers PLAY
+- Device tama tab now shows HUN/THR/HAP bars + H2O (water container level) + GLS (glass health)
+- Buttons changed to FEED/WATER/PLAY with matching cooldowns
+
+Title: Glass behavior overhaul - persistent damage, repairs, random banging
+TL;DR: Glass damage persists after tamas calm down. Players can click-to-repair at containment rooms. Tamas randomly bang on glass even when calm.
+---
+- Glass damage is now persistent — calming a tama no longer auto-repairs the glass. Only manual repair or night restart fixes it.
+- Added click-to-repair interaction: walk up to containment glass, [E] Repair Glass (+10 HP per press). Only shows when glass is damaged and tama isn't escaped.
+- Added `repairPartial()` and `takeDamage()` methods to Containment class for clean external access.
+- Random glass banging: calm tamas randomly charge the glass every 30-90 seconds (30% base chance). Each episode lasts ~7 seconds and deals ~20 HP total.
+- Player visits reduce bang chance to 10% (within 8 units). Chance creeps back up over time.
+- Bang episodes emit `tama:bang` event (for future audio) and trigger camera shake if player is within 15 units, scaled by distance.
+- Tamas show agitated animation during random bangs, then return to calm wandering.
+
+Title: Task system overhaul - interval spawning, night timer, clock, events
+TL;DR: Nights now run on a real-time clock (12AM-6AM). Tasks spawn randomly from a pool on intervals instead of a fixed list. Added event scheduler for ambient scares.
+---
+- Replaced fixed `taskIds` with `taskPool` + `taskInterval` per night. Tasks spawn randomly every 25-75 seconds (varies by night difficulty).
+- Transport is non-blocking — interval tasks start spawning immediately at night start, don't wait for transport.
+- No duplicate spawns: a task from the pool can't spawn again until the previous instance is completed.
+- Night ends on timer (540-600s / 9-10 min) with clean cutoff. No more "complete all tasks to end night."
+- Added NightClock: maps real elapsed time to 12AM-6AM game time. HUD shows clock in top-right corner.
+- Added EventScheduler: supports one-shot events at game hours and repeating events on real-time intervals.
+- Each night config defines events: power surges, room flickers, random ambient flickers. Night 5 gets the most frequent and intense events.
+- Events hook into existing LightingManager methods (triggerPowerSurge, triggerFlicker).
+
+Title: Elevator system - shaft, descent intro, cart hatch escape
+TL;DR: Elevator room is now a full shaft. Player rides down at night start while reading briefing on device. Abandoned cart eggs hatch into escaped creatures.
+---
+- Elevator room ceiling removed, replaced with 35-unit tall shaft with dark walls and emissive light bands
+- Light bands scroll upward during intro, creating illusion of descent while player reads briefing
+- Added ElevatorManager with state machine: IDLE_TOP → DESCENDING → DOORS_OPENING → IDLE_BOTTOM → DOORS_CLOSING → ASCENDING
+- BEGIN SHIFT on device triggers real descent (platform Y=33→0 over ~5.5s), doors slide open at bottom
+- Elevator doors are two sliding panels on the east wall with colliders. Lock/unlock the room's hallway door during descent.
+- Door class now supports `lock()`/`unlock()` with `[LOCKED]` prompt. FacilityBuilder tracks `doorsByRoom` map.
+- Device briefing mode: auto-opens device with night title, briefing text, and BEGIN SHIFT button (CRT styled)
+- Cart hatch escape: if egg reaches final stage while cart is parked OR still in preview (player never started), the task FAILS and creature spawns at cart's world position
+- CreatureManager.spawnCreature() now accepts optional start position for cart escapes
+- Dark cap plane at shaft top hides the open geometry
+
+Title: Infrastructure systems - random failures, repair tasks, cascading effects
+TL;DR: Four hub systems (food, water, server, generator) now randomly go offline during shifts. Each failure creates a repair task and applies gameplay effects until fixed.
+---
+- InfrastructureManager tracks 4 systems: food_processing, water_filtration, server_room, generator_room
+- 75-second grace period at night start before systems can fail. Fail timers scale with night difficulty (harder = more frequent).
+- Multiple systems can be down simultaneously
+- Effects when DOWN: food processing → 2x hunger decay, water filtration → 2x thirst decay, generator → full blackout + 3x all decay (panic mode), server → disables tama care actions on device
+- Bonus when UP: food/water systems give 0.5x decay rate (slower than neutral — rewards keeping systems online)
+- Each failure auto-creates a repair task in the appropriate hub room using existing task types (QTE for generator, wires for server, pipes for water, holdsteady for food)
+- HUD notification flash: red "[SYSTEM] OFFLINE" / green "[SYSTEM] ONLINE" messages in top-right, 3.5s duration
+- Tama tab buttons show [OFFLINE] and are disabled when server room is down
+- Wired into night cycle: activates at night begin with difficulty scaling, resets on death/night end
+
+Title: Security cameras - containment room surveillance with failures and repair
+TL;DR: Each containment room now has a security camera that can randomly fail. Camera-down rooms show animated static on the device instead of the tama sprite. Hold E for 3 seconds in-room to repair.
+---
+- CameraSystem tracks cameras for the 4 containment rooms only (not hub rooms — keeps scope focused)
+- 90-second grace period at night start, then random fail timers (60-180s, scaled by difficulty)
+- Camera props: small dark box + cylindrical lens + green/red LED, mounted high on the observation-side wall
+- LED switches from green → red when camera goes offline (and back on repair)
+- Repair: hold-to-interact (3 seconds) on an invisible trigger placed near the camera in the room
+- Added hold-to-interact support to the Interaction class: tracks E-key hold duration, shows progress bar (█░ characters), calls interact() when hold completes. Reusable for any future hold interactions.
+- Tama-tab: when camera is down for the selected tama, the ASCII sprite area shows animated static noise (░▒▓█ randomized each frame) in a muted color. Bars and status still visible if server is up.
+- No minimap integration — player checks camera status via tama tab
+- Wired into night cycle: activates at night begin, resets on death/night end
+
+Title: Device overhaul - CRT animation, keybindings, battery, physical care
+TL;DR: Device gets a CRT power-on/off effect, full key rebinding with localStorage, battery that drains and charges, and physical tama care at containment rooms that bypasses the server.
+---
+- CRT open/close: replaced scale+fade with clip-path scanline effect. Opens as horizontal line → expands vertically. Closes in reverse → fades.
+- Keybindings system: new `js/core/keybindings.js` singleton maps action names to key codes. Loaded from/saved to localStorage. All movement, sprint, jump, crouch, flashlight, interact, and device keys are rebindable.
+- Settings tab rebuilt with click-to-rebind UI: click a control row, press a key to rebind, Escape to cancel. Reset defaults button.
+- Tama-tab action buttons now show hotkey hints: [1] FEED, [2] WATER, [3] PLAY. Keys 1/2/3 work as shortcuts when the tama tab is active.
+- Battery system: 100% max. Drains 1%/s while device is open, 0.05%/s while idle. Won't open at 0%. Charges at 5%/s at the command center charge station (E to start, walks away to stop).
+- Battery indicator in device header: "BAT 85%". Blinks red below 15%.
+- Physical tama care: 3 interaction triggers at each containment room's glass wall — [E] Feed, [E] Change Water, [E] Give Toy. Bypasses server check (works even when server room is offline). Strategic alternative to using the device.
+- Care triggers only appear when tama is delivered and not escaped, and hide when action is on cooldown.
+- Battery resets to 100% on death/night restart.
+
+Title: Dust particles - atmospheric floating motes with flashlight interaction
+TL;DR: 300 subtle dust particles drift around the player, glowing when caught in the flashlight beam. Purely cosmetic atmosphere.
+---
+- New `js/effects/dust-particles.js` using THREE.Points with custom ShaderMaterial
+- 300 particles in a 20x20x4 box centered on the player, wrapping at edges
+- Slow random drift (0.15 units/sec max) for natural floating feel
+- Custom vertex shader checks if each particle falls inside the flashlight cone: particles in the beam glow brighter and grow slightly (1px → 2.5px)
+- Cone detection uses dot product of flashlight direction vs particle direction with cosine angle threshold
+- Proximity boost: particles very close to flashlight source (< 3 units) get extra glow regardless of cone
+- Base ambient brightness of 0.04 — particles are nearly invisible in the dark, only really pop in the flashlight
+- Additive blending, no depth write — particles layer on top of scene lighting naturally
+- Flashlight world position and direction extracted from SpotLight + target each frame
+
+Title: Visual needs display - habitat canvas with bowls, toys, speech bubbles
+TL;DR: Replaced stat bars on the device tama tab with a canvas-drawn habitat scene. Bowls, toys, and speech bubbles visually represent tama needs instead of numeric bars.
+---
+- Replaced HUN/THR/HAP/H2O/GLS bar rows with a single 280x180 canvas element
+- Food bowl: heaped (>60%), half (30-60%), empty (<30%) with color-coded label
+- Water bowl: blue fill level based on waterLevel (0-100), color shifts when low
+- Toy: visible ball when happiness >40, dashed outline when 15-40, gone below 15
+- Glass cracks: deterministic crack lines from edges when glass health <100, red border glow at critical (<30%)
+- Tama ASCII sprite drawn as text on canvas, with camera-offline static noise still working
+- Speech bubble above tama: "HUNGRY!", "THIRSTY!", "BORED!", "!!!" (agitated/escaped), "..." (content), "~" (okay)
+- Priority: lowest need wins when multiple are low
+- Static noise throttled to every 0.1s when camera is offline to avoid unnecessary redraws
+
+Title: Mouse clamping - unified screen sizing, cursor confinement
+TL;DR: Device and task screens now share the same size (80vw/700px max, 72vh). Invisible backdrop hides cursor outside the active screen.
+---
+- Task overlay (.task-overlay) now matches device container: 80vw max-width:700px height:72vh, flex column layout
+- Task canvases stretch to fill (width:100%, max-height:60vh, object-fit:contain)
+- Added .screen-backdrop: fullscreen invisible div behind device/task screens with cursor:none
+- Device backdrop at z-index:99 (below device at 100), task backdrop at z-index:199 (below task at 200)
+- Cursor visible only over the active screen area, invisible outside — "mouse clamped to the screen"
+- Backdrop created on show, removed on hide for both device-renderer and task-base
+
+Title: Tama delivery timing - delayed transport, configurable hatch speed
+TL;DR: Eggs now arrive at the loading dock ~2 minutes into each night and hatch ~2 minutes later. Timing escalates with difficulty.
+---
+- Added transportDelay and eggHatchTime to night configs (nights 1-4)
+- Night 1-2: cart appears at 120s, hatches 120s later (~min 4)
+- Night 3: cart at 100s (slightly earlier pressure)
+- Night 4: cart at 90s + faster hatch (100s) — hardest timing
+- Night 5: no transport (all tamas already delivered)
+- NightManager delays _configureTasks() + _setupTransportPreview() by transportDelay seconds
+- Pool task spawning still starts immediately (independent of transport)
+- EGG_TOTAL_TIME replaced with per-task _eggTotalTime, set from night config
+- Transport delay and state reset on night restart/death
+
+Title: Bugfixes - elevator double door, tasks spawning at start
+TL;DR: Removed redundant facility door from elevator room (shaft doors handle access). Fixed all tasks appearing at game start instead of spawning on intervals.
+---
+- Elevator room had both a normal facility sliding door AND elevator shaft door panels on the same east wall — removed the facility door entry from layout-data.js. Shaft doors + colliders handle access control. ElevatorManager's lock/unlock calls are safely guarded with null checks.
+- TaskManager constructor was calling placeTrigger() on ALL tasks at creation time, making every task visible immediately. Removed trigger placement from constructor — tasks now only get triggers when explicitly spawned by NightManager (via setActiveTasks for transport/note, or _spawnNextPoolTask for pool tasks).
+- resetAll() was rebuilding _taskList with Object.values(this.tasks) which included all tasks. Changed to clear the list entirely — NightManager now controls what appears and when.
+- Elevator wall opening fix: doorway entry restored with `noDoor: true` flag so the Room class cuts the wall opening, but FacilityBuilder skips creating a Door object. Shaft door panels handle access.
+
+Title: Elevator polish + mandatory check-in task
+TL;DR: Moved elevator shaft light bands off the door wall. Every night now starts with a mandatory check-in task at the command center.
+---
+- Elevator shaft emissive light bands moved from east wall (where the doors are) to north and south walls — no longer visually clashing with the door panels
+- Added `checkin_command` holdsteady task (4s duration) at the command center, spawned at the start of every night via setActiveTasks
+- Transport + note tasks now use addActiveTasks() so they don't wipe the check-in task when they spawn after the transport delay
+- New TaskManager.addActiveTasks() method: appends tasks to the active list without clearing existing ones
+
+Title: Thick walls + recessed doors
+TL;DR: All walls now have visible thickness (0.3 units) using BoxGeometry instead of paper-thin planes. Doors sit recessed within walls. Halved wall mesh count by merging visual+collider.
+---
+- Replaced PlaneGeometry visual walls + invisible BoxGeometry colliders with single visible BoxGeometry meshes throughout the facility
+- Room walls (_addSolidWall, _addWallSegment, lintel): merged into one mesh per segment, removed rotations (box dimensions handle orientation)
+- Doorway reveals are free — BoxGeometry faces on adjacent wall segments naturally form the inner edges of the door opening
+- Door frame posts now match WALL_THICKNESS (0.3) instead of 0.15, so the frame fills the full wall depth
+- Door panels (0.12 thick) sit centered within the 0.3-thick wall — naturally recessed
+- Elevator door panels centered within wall (was offset by -0.06, now at wall boundary center)
+- Outer walls at L-joint corners: same merge pattern, removed PlaneGeometry+collider pairs
+- Habitat walls (containment extensions): back/left/right walls all merged to single BoxGeometry each
+- Dropped THREE.DoubleSide from all wall materials — BoxGeometry has proper outward-facing normals on all faces
+- Wall mesh count roughly halved across the facility (one mesh instead of two per wall segment)
+- North/south walls extended by WALL_THICKNESS to overlap perpendicular walls at corners — creates clean L-shaped hallway corners instead of notched indents
+- Edge strips offset by WALL_THICKNESS/2 inward (both room strips and hallway strips) so they sit at the wall's inner face instead of clipping inside the thick wall
+- Room signs offset by WALL_THICKNESS/2 further into the hallway so text isn't clipped by the thick wall
+- Outer L-joint corner walls extended by WALL_THICKNESS to overlap with extended room walls at corners
+
+Title: Elevator intro rework - quick drop on start
+TL;DR: Night intro now shows just the night number and a START button on the device while the elevator visually descends. Pressing START smoothly drops you to the bottom in about 1 second.
+---
+- Elevator bands scroll during the briefing screen, giving the feeling of riding down before you press anything
+- Device briefing simplified to just the night number (NIGHT 1, etc.) and a big START button — no more briefing text wall
+- Player starts low in the shaft so the rush descent speed matches the band scroll speed — seamless visual transition from "illusion of descent" to actual descent
+- Pressing START drops you to the bottom in ~1 second, doors slide open, and you're playing almost instantly
+
+Title: Elevator behavior - doors reopen, quit penalty
+TL;DR: Elevator doors reopen if you walk back in while they're closing. Stay inside too long and it takes you back up — game over.
+---
+- Elevator waits at the bottom with doors open until you leave, then starts closing
+- If you walk back into the elevator while doors are closing, they reopen — no getting trapped by accident
+- Linger inside the elevator for 60 seconds and it forces the doors shut, locks you in, and rides back up
+- Riding the elevator up triggers a "YOU QUIT" game over screen — shift abandoned, retry the night
+
+Title: Cursor confinement - mouse locked to device and task screens
+TL;DR: Opening the device or a task screen now keeps your cursor trapped inside it — no more losing the mouse off-screen.
+---
+- Custom crosshair cursor appears on device and task screens, confined to the screen bounds
+- Cursor can't escape the screen area no matter how fast you move the mouse
+- Hover highlights still work on buttons and interactive elements
+- If pointer lock drops (e.g. tabbing out), falls back to regular mouse behavior gracefully
+
+Title: Circular minimap - player-centered rotating radar
+TL;DR: Minimap redesigned as a circular radar display. Player is always centered and facing up, map rotates around you. Off-screen tasks show as dots on the circle's edge.
+---
+- Minimap is now a circular view instead of a square overview of the whole facility
+- Player is always at the center facing up — the map rotates with your camera
+- ~25 world unit view radius, so you can see nearby rooms and hallways
+- Room walls drawn with visible gaps where doorways are — easy to spot entrances
+- Player shown as an upward-pointing green triangle
+- Yellow task dots appear inside the circle for nearby tasks
+- Tasks outside the visible area get clamped to the circle's perimeter — you can always tell which direction to go
+- Current room highlights brighter green when you're inside it
+
+Title: QTE fitting fixes for new device format
+TL;DR: Fixed all task mini-games to properly fit and work inside the 3:2 device screen.
+---
+- Fixed broken click detection on canvas tasks (wires, pipes, hold-steady) — clicks were landing in wrong spots due to canvas stretching
+- Pipe puzzle now uses a wider landscape layout that fills the screen better instead of a small centered square
+- Observation report (notes task) compacted to fit without overflow — smaller text and scrollable fallback
+- Glass repair ASCII art and key prompt QTE scaled down to fit the screen proportions
+- Task screens now scroll gracefully if content is too tall instead of silently clipping
+
+Title: Enclosure setup tasks + minimap pathfinding + elevator fix
+TL;DR: Before the egg cart arrives, you now fetch food, water, and a toy to prepare the target containment room. Carrying/pushing escort tasks show a green path line on the minimap. Elevator doors open when the cart spawns.
+---
+- 3 new fetch tasks per night: grab a food bowl from food processing, water container from water filtration, and toy from storage, then carry each to the target containment room
+- Carried items float in front of you while walking — slower movement, no sprinting. Press Q to drop, E to pick back up.
+- Placing all 3 items in the containment room before the egg arrives sets up the enclosure
+- Minimap now shows a green dashed pathfinding line from your position to the destination when carrying an item or pushing the transport cart
+- Elevator doors now open automatically when the transport cart spawns at the loading dock — no more sealed elevator room
+- Doors close normally once you pick up the cart and leave
+- Can't push the cart while carrying an item (and vice versa) — forces you to plan your trips
+
+Title: Fetch item fixes + enclosure gating + blackout fix
+TL;DR: Carried items now feel snappy and visible. Enclosures start empty — care actions locked until you deliver the matching supply item. Blackout from containment breaches no longer gets cleared by generator repairs.
+---
+- Carried items held higher (visible in lower-half of vision), track hand movement instantly, no speed penalty or sprint block
+- Items can now be placed at containment rooms — placement trigger sits at the glass wall where you can actually reach it
+- Placed items appear as visible props inside the habitat behind the glass (food left, water center, toy right)
+- Care actions (Feed/Water/Play) at containment glass and on device are locked until the matching item is delivered — empty enclosure, no care
+- Device care buttons show "---" when item not yet placed
+- Minimap green path line now shows reliably when carrying items (falls back to straight line if pathfinding fails)
+- Blackout system now tracks reasons separately — generator failure blackout and containment breach blackout don't cancel each other out. Fixing the generator no longer clears a breach blackout.
+
+Title: Polish pass - dust, alerts, easier tasks, prop glow, generator room
+TL;DR: Dust particles bigger, navigation turns red during blackouts, QTE and hold-steady tasks are more forgiving, task highlights glow on actual room props, and generator room breaker panels no longer block the door.
+---
+- Dust particles ~50% larger — more visible, especially in flashlight beam
+- Edge strips, room signs, and minimap border all turn red during blackout (breach or generator failure), return to green when resolved
+- QTE tasks no longer have a countdown timer or wrong-key time penalty — just press the right keys at your own pace
+- Hold-steady tasks no longer drain progress when cursor leaves the circle — progress just pauses, never decreases
+- Task highlights replaced: instead of a floating [!] and spinning wireframe box, the nearest room prop now glows with a cycling iridescent color (shifts through the whole rainbow) and pulses, fading with distance
+- Generator room breaker panels moved from east wall (blocking the door) to west wall. Barrels mirrored to the east side.
+
+Title: Minimap accuracy + carry polish
+TL;DR: Minimap dots now point to actual task props instead of room centers. Carried items feel properly held in front of you. Map declutters during carry and breach.
+---
+- Task dots on the minimap now align with the actual prop you need to interact with, not the room's center point
+- HUD direction arrow also points to the correct prop location
+- Carried items are now held in front of the camera — follows your view when looking up/down, with a subtle walking bob
+- Dropped items land at foot level instead of floating at eye height
+- While carrying an item, only the destination shows on the minimap — other task dots hidden to reduce clutter
+- During containment breach, only glass repair and infra repair tasks show on the minimap — regular pool tasks hidden
+- Task props are non-interactable when hidden from the map (during carry or breach)
+
+Title: Earlier cart + device tama visibility
+TL;DR: First egg cart arrives at 1 minute instead of 2. Tamas only show on the device once their cart arrives, and care controls unlock when they hatch.
+---
+- Night 1 cart now arrives at the loading dock after 1 minute (was 2 minutes) — less dead time at the start
+- Device tama tab sidebar is empty at the start of a night — tamas appear only when their transport cart arrives
+- Care controls (Feed/Water/Play) stay hidden until the tama fully hatches — no interacting with an unhatched egg
+- Already-delivered tamas from previous nights show up immediately with full controls

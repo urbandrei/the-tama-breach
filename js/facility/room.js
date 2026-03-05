@@ -9,7 +9,6 @@ const glassWallMat = new THREE.MeshStandardMaterial({
   color: 0x88ccff,
   transparent: true,
   opacity: 0.25,
-  side: THREE.DoubleSide,
   roughness: 0.1,
   metalness: 0.2,
   depthWrite: false,
@@ -25,6 +24,7 @@ export class Room {
     this.glassPanels = [];
 
     this._glassWall = options.glassWall || null;
+    this._noCeiling = options.noCeiling || false;
 
     const [cx, cz] = roomData.center;
     const [w, d] = roomData.size;
@@ -36,7 +36,7 @@ export class Room {
     const myDoorways = doorways.filter(dw => dw.roomId === this.id);
 
     this._buildFloor(w, d);
-    this._buildCeiling(w, d, h);
+    if (!this._noCeiling) this._buildCeiling(w, d, h);
     this._buildWalls(w, d, h, myDoorways);
   }
 
@@ -69,10 +69,11 @@ export class Room {
 
     // Each wall: [axis along wall, wall length, position, rotation, side name]
     const wallDefs = [
-      { side: 'north', length: w, pos: [0, h / 2, hd], rotY: Math.PI, along: 'x' },
-      { side: 'south', length: w, pos: [0, h / 2, -hd], rotY: 0, along: 'x' },
-      { side: 'east', length: d, pos: [hw, h / 2, 0], rotY: -Math.PI / 2, along: 'z' },
-      { side: 'west', length: d, pos: [-hw, h / 2, 0], rotY: Math.PI / 2, along: 'z' },
+      // X-walls extend past Z-walls at corners for clean L-shapes (overshoot avoids coplanar z-fighting)
+      { side: 'north', length: w + WALL_THICKNESS + 0.02, pos: [0, h / 2, hd], along: 'x' },
+      { side: 'south', length: w + WALL_THICKNESS + 0.02, pos: [0, h / 2, -hd], along: 'x' },
+      { side: 'east', length: d, pos: [hw, h / 2, 0], along: 'z' },
+      { side: 'west', length: d, pos: [-hw, h / 2, 0], along: 'z' },
     ];
 
     for (const wd of wallDefs) {
@@ -93,34 +94,27 @@ export class Room {
   _addSolidWall(wd, h) {
     const isGlass = this._glassWall === wd.side;
     const mat = isGlass ? glassWallMat : wallMat;
-
-    // Visual wall
-    const wall = new THREE.Mesh(
-      new THREE.PlaneGeometry(wd.length, h),
-      mat
-    );
-    wall.position.set(...wd.pos);
-    wall.rotation.y = wd.rotY;
-    if (!isGlass) wall.receiveShadow = true;
-    this.group.add(wall);
-
-    if (isGlass) {
-      this.glassPanels.push(wall);
-    }
-
-    // Collider (always solid — blocks player even through glass)
     const isXWall = wd.along === 'x';
-    const collider = new THREE.Mesh(
+
+    const wall = new THREE.Mesh(
       new THREE.BoxGeometry(
         isXWall ? wd.length : WALL_THICKNESS,
         h,
         isXWall ? WALL_THICKNESS : wd.length
       ),
-      new THREE.MeshBasicMaterial({ visible: false })
+      mat
     );
-    collider.position.set(...wd.pos);
-    this.group.add(collider);
-    this.colliders.push(collider);
+    wall.position.set(...wd.pos);
+    if (!isGlass) {
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+    }
+    this.group.add(wall);
+    this.colliders.push(wall);
+
+    if (isGlass) {
+      this.glassPanels.push(wall);
+    }
   }
 
   _addWallWithDoorway(wd, h, doorOffset) {
@@ -151,7 +145,11 @@ export class Room {
       const lintelY = DOOR_HEIGHT + lintelH / 2;
 
       const lintel = new THREE.Mesh(
-        new THREE.PlaneGeometry(DOOR_WIDTH, lintelH),
+        new THREE.BoxGeometry(
+          isXWall ? DOOR_WIDTH : WALL_THICKNESS,
+          lintelH,
+          isXWall ? WALL_THICKNESS : DOOR_WIDTH
+        ),
         wallMat
       );
       if (isXWall) {
@@ -159,29 +157,20 @@ export class Room {
       } else {
         lintel.position.set(wd.pos[0], lintelY, wd.pos[2] + doorCenter);
       }
-      lintel.rotation.y = wd.rotY;
+      lintel.castShadow = true;
       lintel.receiveShadow = true;
       this.group.add(lintel);
-
-      // Lintel collider
-      const lc = new THREE.Mesh(
-        new THREE.BoxGeometry(
-          isXWall ? DOOR_WIDTH : WALL_THICKNESS,
-          lintelH,
-          isXWall ? WALL_THICKNESS : DOOR_WIDTH
-        ),
-        new THREE.MeshBasicMaterial({ visible: false })
-      );
-      lc.position.copy(lintel.position);
-      this.group.add(lc);
-      this.colliders.push(lc);
+      this.colliders.push(lintel);
     }
   }
 
   _addWallSegment(wd, h, centerOffset, segLen, isXWall) {
-    // Visual segment
     const seg = new THREE.Mesh(
-      new THREE.PlaneGeometry(segLen, h),
+      new THREE.BoxGeometry(
+        isXWall ? segLen : WALL_THICKNESS,
+        h,
+        isXWall ? WALL_THICKNESS : segLen
+      ),
       wallMat
     );
     if (isXWall) {
@@ -189,21 +178,9 @@ export class Room {
     } else {
       seg.position.set(wd.pos[0], wd.pos[1], wd.pos[2] + centerOffset);
     }
-    seg.rotation.y = wd.rotY;
+    seg.castShadow = true;
     seg.receiveShadow = true;
     this.group.add(seg);
-
-    // Collider
-    const collider = new THREE.Mesh(
-      new THREE.BoxGeometry(
-        isXWall ? segLen : WALL_THICKNESS,
-        h,
-        isXWall ? WALL_THICKNESS : segLen
-      ),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    collider.position.copy(seg.position);
-    this.group.add(collider);
-    this.colliders.push(collider);
+    this.colliders.push(seg);
   }
 }

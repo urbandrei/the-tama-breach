@@ -3,7 +3,7 @@ import { HALLWAY_WIDTH, HALLWAY_HEIGHT } from './layout-data.js';
 
 const hallFloorMat = new THREE.MeshStandardMaterial({ color: 0x3d3d3d, roughness: 0.95 });
 const hallCeilMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 });
-const hallWallMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.85 });
+const hallWallMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.85, side: THREE.DoubleSide });
 
 export class Hallway {
   constructor(hallData) {
@@ -28,6 +28,7 @@ export class Hallway {
 
     const hw = HALLWAY_WIDTH / 2;
     const h = HALLWAY_HEIGHT;
+    const wallConfig = hallData.walls || 'both';
 
     // Floor
     const floor = new THREE.Mesh(
@@ -56,40 +57,44 @@ export class Hallway {
     ceil.position.y = h;
     this.group.add(ceil);
 
-    // Left wall (local -x)
-    const leftWall = new THREE.Mesh(
-      new THREE.PlaneGeometry(length, h),
-      hallWallMat
-    );
-    leftWall.position.set(-hw, h / 2, 0);
-    leftWall.rotation.y = Math.PI / 2;
-    leftWall.receiveShadow = true;
-    this.group.add(leftWall);
+    // Left wall (local -x) — skip if walls is 'right' or 'none'
+    if (wallConfig === 'both' || wallConfig === 'left') {
+      const leftWall = new THREE.Mesh(
+        new THREE.PlaneGeometry(length, h),
+        hallWallMat
+      );
+      leftWall.position.set(-hw, h / 2, 0);
+      leftWall.rotation.y = Math.PI / 2;
+      leftWall.receiveShadow = true;
+      this.group.add(leftWall);
 
-    const lc = new THREE.Mesh(
-      new THREE.BoxGeometry(0.2, h, length),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    lc.position.set(-hw, h / 2, 0);
-    this.group.add(lc);
-    this.colliders.push(lc);
+      const lc = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, h, length),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      lc.position.set(-hw, h / 2, 0);
+      this.group.add(lc);
+      this.colliders.push(lc);
+    }
 
-    // Right wall (local +x)
-    const rightWall = new THREE.Mesh(
-      new THREE.PlaneGeometry(length, h),
-      hallWallMat
-    );
-    rightWall.position.set(hw, h / 2, 0);
-    rightWall.rotation.y = -Math.PI / 2;
-    rightWall.receiveShadow = true;
-    this.group.add(rightWall);
+    // Right wall (local +x) — skip if walls is 'left' or 'none'
+    if (wallConfig === 'both' || wallConfig === 'right') {
+      const rightWall = new THREE.Mesh(
+        new THREE.PlaneGeometry(length, h),
+        hallWallMat
+      );
+      rightWall.position.set(hw, h / 2, 0);
+      rightWall.rotation.y = -Math.PI / 2;
+      rightWall.receiveShadow = true;
+      this.group.add(rightWall);
 
-    const rc = new THREE.Mesh(
-      new THREE.BoxGeometry(0.2, h, length),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    rc.position.set(hw, h / 2, 0);
-    this.group.add(rc);
-    this.colliders.push(rc);
+      const rc = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, h, length),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      rc.position.set(hw, h / 2, 0);
+      this.group.add(rc);
+      this.colliders.push(rc);
+    }
   }
 }

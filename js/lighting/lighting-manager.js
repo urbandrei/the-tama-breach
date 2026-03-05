@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { rooms, hallways } from '../facility/layout-data.js';
 import { randomFloat } from '../utils/math-utils.js';
 
-const BRIGHT_MULTIPLIER = 5.0;
+const BRIGHT_MULTIPLIER = 2.5;
 
 export class LightingManager {
   constructor(scene, game) {
@@ -11,14 +11,16 @@ export class LightingManager {
     this.lights = [];
     this._flickerTimers = [];
 
-    // Blackout state
-    this._blackout = false;
+    // Blackout state — reference counted by reason
+    this._blackoutReasons = new Set();
     this._blackoutProgress = 0; // 0=normal, 1=dark
     this._blackoutDirection = 0; // 1=going dark, -1=restoring
     this._blackoutSpeed = 5.0;
 
     // Emissive navigation aids (set after construction via setNavigationAids)
     this._edgeStrips = null;
+    this._roomSigns = null;
+    this._alertActive = false;
 
     // Fog control — density ramps up during blackout
     this._fog = scene.fog;
@@ -26,7 +28,7 @@ export class LightingManager {
     this._fogBlackoutDensity = 0.06;
 
     // Bright ambient — fluorescent level
-    this._ambientBaseIntensity = 2.0;
+    this._ambientBaseIntensity = 1.0;
     this._ambient = new THREE.AmbientLight(0x99aabb, this._ambientBaseIntensity);
     scene.add(this._ambient);
 
@@ -35,7 +37,7 @@ export class LightingManager {
 
     // Listen for breach events
     if (game) {
-      game.on('containment:breach', () => this.goBlackout());
+      game.on('containment:breach', () => this.goBlackout('breach'));
     }
   }
 
@@ -99,18 +101,42 @@ export class LightingManager {
     }
   }
 
-  setNavigationAids(edgeStrips) {
+  setNavigationAids(edgeStrips, roomSigns) {
     this._edgeStrips = edgeStrips;
+    this._roomSigns = roomSigns;
   }
 
-  goBlackout() {
-    this._blackout = true;
+  goBlackout(reason = 'breach') {
+    this._blackoutReasons.add(reason);
     this._blackoutDirection = 1;
   }
 
-  restoreAll() {
-    this._blackout = false;
-    this._blackoutDirection = -1;
+  restoreBlackout(reason = 'breach') {
+    this._blackoutReasons.delete(reason);
+    // Only actually restore if no reasons remain
+    if (this._blackoutReasons.size === 0) {
+      this._blackoutDirection = -1;
+    }
+  }
+
+  resetFull() {
+    this._blackoutReasons.clear();
+    this._blackoutProgress = 0;
+    this._blackoutDirection = 0;
+    for (const entry of this.lights) {
+      entry.light.intensity = entry.baseIntensity;
+      entry.flickerType = 'none';
+      entry.agitatedFlicker = false;
+      entry.nextFlicker = randomFloat(8, 25);
+    }
+    this._ambient.intensity = this._ambientBaseIntensity;
+    if (this._fog) this._fog.density = this._fogBaseDensity;
+    if (this._edgeStrips) {
+      this._edgeStrips.setIntensity(0);
+      this._edgeStrips.setAlert(false);
+    }
+    if (this._roomSigns) this._roomSigns.setAlert(false);
+    this._alertActive = false;
   }
 
   setAgitatedFlicker(roomId, active) {
@@ -148,6 +174,17 @@ export class LightingManager {
     // Ramp edge strips up as blackout progresses
     if (this._edgeStrips) {
       this._edgeStrips.setIntensity(this._blackoutProgress * 0.6);
+    }
+
+    // Toggle alert color on navigation aids during blackout
+    if (this._blackoutReasons.size > 0 && !this._alertActive) {
+      this._alertActive = true;
+      if (this._edgeStrips) this._edgeStrips.setAlert(true);
+      if (this._roomSigns) this._roomSigns.setAlert(true);
+    } else if (this._blackoutReasons.size === 0 && this._alertActive) {
+      this._alertActive = false;
+      if (this._edgeStrips) this._edgeStrips.setAlert(false);
+      if (this._roomSigns) this._roomSigns.setAlert(false);
     }
 
     for (const entry of this.lights) {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { rooms, hallways, doorways, DOOR_WIDTH } from './layout-data.js';
+import { rooms, hallways, doorways, DOOR_WIDTH, WALL_THICKNESS, HALLWAY_HEIGHT } from './layout-data.js';
 import { Room } from './room.js';
 import { Hallway } from './hallway.js';
 import { Door } from './door.js';
@@ -11,7 +11,11 @@ export class FacilityBuilder {
     this.rooms = [];
     this.hallways = [];
     this.doors = [];
+    this.doorsByRoom = {};           // roomId -> Door instance
     this.containmentChambers = {}; // roomId -> { group, glassPanels, ... }
+    this.elevatorShaft = null;     // elevator shaft userData (platform, doors, bands)
+    this.cameraProps = {};         // roomId -> camera LED mesh (for CameraSystem)
+    this.roomProps = {};           // roomId -> array of prop groups (for task highlights)
     this._roomGlassPanels = {};    // roomId -> glass panel meshes from Room
     this._built = false;
   }
@@ -23,6 +27,7 @@ export class FacilityBuilder {
     this._buildRooms();
     this._buildHallways();
     this._buildDoors();
+    this._buildOuterWalls();
     this._buildProps();
   }
 
@@ -34,7 +39,10 @@ export class FacilityBuilder {
         glassWall = (roomData.id === 'contain_a' || roomData.id === 'contain_b') ? 'north' : 'south';
       }
 
-      const room = new Room(roomData, doorways, { glassWall });
+      // Elevator room has no ceiling (open shaft above)
+      const noCeiling = roomData.propType === 'elevator';
+
+      const room = new Room(roomData, doorways, { glassWall, noCeiling });
       this.game.scene.add(room.group);
       this.game.physics.addColliders(this._worldColliders(room.group, room.colliders));
       this.rooms.push(room);
@@ -58,6 +66,8 @@ export class FacilityBuilder {
   _buildDoors() {
     // Place a door at each doorway
     for (const dw of doorways) {
+      if (dw.noDoor) continue; // wall opening only, no Door object
+
       const roomData = rooms.find(r => r.id === dw.roomId);
       if (!roomData) continue;
 
@@ -86,11 +96,39 @@ export class FacilityBuilder {
           break;
       }
 
-      const door = new Door(doorX, doorZ, dw.wallSide);
+      const door = new Door(doorX, doorZ, dw.wallSide, this.game);
       this.game.scene.add(door.group);
       this.game.physics.addColliders(this._worldColliders(door.group, door.colliders));
       this.game.player.interaction.addInteractable(door.trigger);
       this.doors.push(door);
+      this.doorsByRoom[dw.roomId] = door;
+    }
+  }
+
+  _buildOuterWalls() {
+    // Close the 4 gaps at L-joint corners where no room walls exist
+    // Each gap is a 5-unit-long wall at X=±15
+    const h = HALLWAY_HEIGHT;
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.85 });
+    const gapLen = 5; // matches HALLWAY_WIDTH
+
+    const corners = [
+      { x: -15, z: 12.5 },
+      { x: 15, z: 12.5 },
+      { x: -15, z: -12.5 },
+      { x: 15, z: -12.5 },
+    ];
+
+    for (const c of corners) {
+      const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(WALL_THICKNESS, h, gapLen),
+        wallMat
+      );
+      wall.position.set(c.x, h / 2, c.z);
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      this.game.scene.add(wall);
+      this.game.physics.addColliders([wall]);
     }
   }
 
@@ -103,6 +141,20 @@ export class FacilityBuilder {
           this.game.physics.addColliders(
             this._worldColliders(result.group, result.colliders)
           );
+        }
+
+        // Track prop groups per room for task highlights
+        if (!this.roomProps[roomData.id]) this.roomProps[roomData.id] = [];
+        this.roomProps[roomData.id].push(result.group);
+
+        // Capture elevator shaft refs
+        if (result.group.name === 'elevator_shaft') {
+          this.elevatorShaft = result.group.userData;
+        }
+
+        // Capture camera LED refs
+        if (result.group.userData.cameraLed) {
+          this.cameraProps[roomData.id] = result.group.userData.cameraLed;
         }
 
         // Capture habitat extensions for tamagotchi system

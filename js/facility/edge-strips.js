@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { rooms, hallways, doorways, DOOR_WIDTH, DOOR_HEIGHT, HALLWAY_WIDTH } from './layout-data.js';
+import { rooms, hallways, doorways, DOOR_WIDTH, DOOR_HEIGHT, HALLWAY_WIDTH, WALL_THICKNESS } from './layout-data.js';
 
 const STRIP_HEIGHT = 0.05;
 const STRIP_DEPTH = 0.04;
 const STRIP_Y = STRIP_HEIGHT / 2; // sit on floor
-const ROOM_INSET = 0.03; // offset strips into room so they're visible from inside
+const ROOM_INSET = WALL_THICKNESS / 2; // offset strips past wall inner face
+const HALL_INSET = WALL_THICKNESS / 2; // offset hallway strips past wall inner face
 
 export class EdgeStrips {
   constructor(scene) {
@@ -23,6 +24,10 @@ export class EdgeStrips {
 
   setIntensity(value) {
     this._material.emissiveIntensity = value;
+  }
+
+  setAlert(active) {
+    this._material.emissive.setHex(active ? 0xff2222 : 0x00ff41);
   }
 
   _buildRoomStrips(scene) {
@@ -91,6 +96,12 @@ export class EdgeStrips {
 
   _buildHallwayStrips(scene) {
     for (const hall of hallways) {
+      // Corner patches get L-shaped strips along outer walls only
+      if (hall.id.startsWith('corner_')) {
+        this._buildCornerStrips(scene, hall);
+        continue;
+      }
+
       const [sx, sz] = hall.start;
       const [ex, ez] = hall.end;
 
@@ -109,30 +120,59 @@ export class EdgeStrips {
         const geo = new THREE.BoxGeometry(STRIP_DEPTH, STRIP_HEIGHT, length);
 
         const leftStrip = new THREE.Mesh(geo, this._material);
-        leftStrip.position.set(sx - halfHW, STRIP_Y, midZ);
+        leftStrip.position.set(sx - halfHW + HALL_INSET, STRIP_Y, midZ);
         scene.add(leftStrip);
 
         const rightStrip = new THREE.Mesh(geo.clone(), this._material);
-        rightStrip.position.set(sx + halfHW, STRIP_Y, midZ);
+        rightStrip.position.set(sx + halfHW - HALL_INSET, STRIP_Y, midZ);
         scene.add(rightStrip);
       } else {
         // E-W hallway: walls on north/south sides
         const geo = new THREE.BoxGeometry(length, STRIP_HEIGHT, STRIP_DEPTH);
 
         const leftStrip = new THREE.Mesh(geo, this._material);
-        leftStrip.position.set(midX, STRIP_Y, sz - halfHW);
+        leftStrip.position.set(midX, STRIP_Y, sz - halfHW + HALL_INSET);
         scene.add(leftStrip);
 
         const rightStrip = new THREE.Mesh(geo.clone(), this._material);
-        rightStrip.position.set(midX, STRIP_Y, sz + halfHW);
+        rightStrip.position.set(midX, STRIP_Y, sz + halfHW - HALL_INSET);
         scene.add(rightStrip);
       }
     }
   }
 
+  _buildCornerStrips(scene, hall) {
+    const [sx, sz] = hall.start;
+    const [ex, ez] = hall.end;
+    const halfHW = HALLWAY_WIDTH / 2;
+    const length = Math.abs(ex - sx);
+    const midX = (sx + ex) / 2;
+    const midZ = sz;
+
+    // Outer Z edge (the side farther from Z=0) — strip runs along X
+    const outerZ = midZ > 0 ? midZ + halfHW - HALL_INSET : midZ - halfHW + HALL_INSET;
+    const zStrip = new THREE.Mesh(
+      new THREE.BoxGeometry(length, STRIP_HEIGHT, STRIP_DEPTH),
+      this._material
+    );
+    zStrip.position.set(midX, STRIP_Y, outerZ);
+    scene.add(zStrip);
+
+    // Outer X edge (the endpoint farther from X=0) — strip runs along Z
+    const outerXEnd = Math.abs(sx) > Math.abs(ex) ? sx : ex;
+    const xInset = outerXEnd > 0 ? -HALL_INSET : HALL_INSET;
+    const xStrip = new THREE.Mesh(
+      new THREE.BoxGeometry(STRIP_DEPTH, STRIP_HEIGHT, HALLWAY_WIDTH),
+      this._material
+    );
+    xStrip.position.set(outerXEnd + xInset, STRIP_Y, midZ);
+    scene.add(xStrip);
+  }
+
   _buildDoorStrips(scene) {
     const doorH = DOOR_HEIGHT || 2.8;
     const halfDoor = DOOR_WIDTH / 2;
+    const wallHalf = WALL_THICKNESS / 2;
 
     for (const dw of doorways) {
       const roomData = rooms.find(r => r.id === dw.roomId);
@@ -146,22 +186,28 @@ export class EdgeStrips {
       let doorX, doorZ;
       const isNS = dw.wallSide === 'north' || dw.wallSide === 'south';
 
+      // Offset strips to hallway-side face of the thick wall
+      let offsetX = 0, offsetZ = 0;
       switch (dw.wallSide) {
         case 'north':
           doorX = cx + dw.position;
           doorZ = cz + halfH;
+          offsetZ = wallHalf;
           break;
         case 'south':
           doorX = cx + dw.position;
           doorZ = cz - halfH;
+          offsetZ = -wallHalf;
           break;
         case 'east':
           doorX = cx + halfW;
           doorZ = cz + dw.position;
+          offsetX = wallHalf;
           break;
         case 'west':
           doorX = cx - halfW;
           doorZ = cz + dw.position;
+          offsetX = -wallHalf;
           break;
         default:
           continue;
@@ -177,17 +223,17 @@ export class EdgeStrips {
       let topGeo;
 
       if (isNS) {
-        leftStrip.position.set(doorX - halfDoor, doorH / 2, doorZ);
-        rightStrip.position.set(doorX + halfDoor, doorH / 2, doorZ);
+        leftStrip.position.set(doorX - halfDoor, doorH / 2, doorZ + offsetZ);
+        rightStrip.position.set(doorX + halfDoor, doorH / 2, doorZ + offsetZ);
         topGeo = new THREE.BoxGeometry(DOOR_WIDTH, STRIP_DEPTH, STRIP_DEPTH);
       } else {
-        leftStrip.position.set(doorX, doorH / 2, doorZ - halfDoor);
-        rightStrip.position.set(doorX, doorH / 2, doorZ + halfDoor);
+        leftStrip.position.set(doorX + offsetX, doorH / 2, doorZ - halfDoor);
+        rightStrip.position.set(doorX + offsetX, doorH / 2, doorZ + halfDoor);
         topGeo = new THREE.BoxGeometry(STRIP_DEPTH, STRIP_DEPTH, DOOR_WIDTH);
       }
 
       const topStrip = new THREE.Mesh(topGeo, this._material);
-      topStrip.position.set(doorX, doorH, doorZ);
+      topStrip.position.set(doorX + offsetX, doorH + STRIP_DEPTH, doorZ + offsetZ);
 
       scene.add(leftStrip);
       scene.add(rightStrip);

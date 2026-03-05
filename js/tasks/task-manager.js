@@ -5,6 +5,8 @@ import { TaskPipes } from './task-pipes.js';
 import { TaskHoldSteady } from './task-holdsteady.js';
 import { TaskTransport } from './task-transport.js';
 import { TaskGlassRepair } from './task-glass-repair.js';
+import { TaskNotes } from './task-notes.js';
+import { TaskFetchItem } from './task-fetch-item.js';
 import { ROOM_TO_TAMA } from '../tamagotchi/personality.js';
 
 const TASK_CONFIGS = [
@@ -12,9 +14,9 @@ const TASK_CONFIGS = [
     id: 'electrical_qte',
     type: 'qte',
     title: 'Reset breaker panel C',
-    roomId: 'electrical',
-    location: 'Electrical',
-    triggerPosition: [-33.5, 1.4, 16],
+    roomId: 'generator_room',
+    location: 'Generator Room',
+    triggerPosition: [1, 1.4, -5],
     keyCount: 5,
     timeLimit: 8,
   },
@@ -24,7 +26,7 @@ const TASK_CONFIGS = [
     title: 'Reconnect server UPS',
     roomId: 'server_room',
     location: 'Server Room',
-    triggerPosition: [28, 1.4, 16],
+    triggerPosition: [-5, 1.4, -7],
   },
   {
     id: 'water_pipes',
@@ -32,7 +34,7 @@ const TASK_CONFIGS = [
     title: 'Calibrate filtration pipes',
     roomId: 'water_filtration',
     location: 'Water Filtration',
-    triggerPosition: [0, 1.4, 40],
+    triggerPosition: [19.25, 1.4, 5],
   },
   {
     id: 'storage_calibrate',
@@ -40,27 +42,99 @@ const TASK_CONFIGS = [
     title: 'Calibrate storage sensors',
     roomId: 'storage',
     location: 'Storage',
-    triggerPosition: [0, 1.4, -24],
+    triggerPosition: [19.25, 1.4, -5],
     duration: 5,
+  },
+  {
+    id: 'checkin_command',
+    type: 'holdsteady',
+    title: 'Check in at command center',
+    roomId: 'command_center',
+    location: 'Command Center',
+    triggerPosition: [-19.25, 1.4, -5],
+    duration: 4,
   },
   {
     id: 'transport_specimen',
     type: 'transport',
     title: 'Transport specimen crate',
-    roomId: 'loading_dock',
-    location: 'Loading Dock',
-    triggerPosition: [0, 1.4, -8],
+    roomId: 'elevator',
+    location: 'Elevator',
+    triggerPosition: [-19.25, 1.4, 5],
     targetRoomId: 'contain_b',
-    targetPosition: [30, 0, 40],
+    targetPosition: [7.5, 0, 19],
+  },
+  {
+    id: 'note_specimen',
+    type: 'notes',
+    title: 'Record specimen observations',
+    roomId: 'contain_b',
+    location: 'Containment B',
+    triggerPosition: [7.5, 1.4, 19],
+  },
+  {
+    id: 'fetch_food',
+    type: 'fetch_item',
+    title: 'Fetch food supply',
+    roomId: 'food_processing',
+    location: 'Food Processing',
+    triggerPosition: [5, 1.4, 5],
+    itemType: 'food',
+    sourcePosition: [5, 1.4, 5],
+    destinationPosition: [7.5, 0, 19],
+  },
+  {
+    id: 'fetch_water',
+    type: 'fetch_item',
+    title: 'Fetch water supply',
+    roomId: 'water_filtration',
+    location: 'Water Filtration',
+    triggerPosition: [19.25, 1.4, 5],
+    itemType: 'water',
+    sourcePosition: [19.25, 1.4, 5],
+    destinationPosition: [7.5, 0, 19],
+  },
+  {
+    id: 'fetch_toy',
+    type: 'fetch_item',
+    title: 'Fetch toy supply',
+    roomId: 'storage',
+    location: 'Storage',
+    triggerPosition: [19.25, 1.4, -5],
+    itemType: 'toy',
+    sourcePosition: [19.25, 1.4, -5],
+    destinationPosition: [7.5, 0, 19],
   },
 ];
 
 // Room center positions for containment rooms (for glass repair triggers)
 const ROOM_CENTERS = {
-  contain_a: [-30, 1.4, 40],
-  contain_b: [30, 1.4, 40],
-  contain_c: [30, 1.4, -8],
-  contain_d: [-30, 1.4, -8],
+  contain_a: [-7.5, 1.4, 19],
+  contain_b: [7.5, 1.4, 19],
+  contain_c: [-7.5, 1.4, -19],
+  contain_d: [7.5, 1.4, -19],
+};
+
+// Hub room centers for infrastructure repair tasks
+const HUB_CENTERS = {
+  food_processing: [5, 1.4, 5],
+  water_filtration: [19.25, 1.4, 5],
+  server_room: [-5, 1.4, -5],
+  generator_room: [1, 1.4, -5],
+};
+
+const INFRA_LABELS = {
+  food_processing: 'Food Processing',
+  water_filtration: 'Water Filtration',
+  server_room: 'Server Room',
+  generator_room: 'Generator Room',
+};
+
+const INFRA_TITLES = {
+  food_processing: 'Restore food processing',
+  water_filtration: 'Fix water filtration',
+  server_room: 'Reconnect server systems',
+  generator_room: 'Restart generator',
 };
 
 export class TaskManager {
@@ -69,13 +143,11 @@ export class TaskManager {
     this.tasks = {};
     this._taskList = [];
 
-    // Create standard tasks
+    // Create standard tasks (triggers placed later by NightManager)
     for (const config of TASK_CONFIGS) {
       const task = this._createTask(config);
       if (task) {
         this.tasks[config.id] = task;
-        this._taskList.push(task);
-        task.placeTrigger();
       }
     }
 
@@ -92,9 +164,45 @@ export class TaskManager {
       case 'holdsteady': return new TaskHoldSteady(this.game, config);
       case 'transport': return new TaskTransport(this.game, config);
       case 'glass_repair': return new TaskGlassRepair(this.game, config);
+      case 'notes': return new TaskNotes(this.game, config);
+      case 'fetch_item': return new TaskFetchItem(this.game, config);
       default:
         console.warn(`Unknown task type: ${config.type}`);
         return null;
+    }
+  }
+
+  createInfraRepairTask(systemId, taskType, roomId) {
+    const repairId = `infra_repair_${systemId}`;
+
+    // Don't create duplicate
+    if (this.tasks[repairId]) return;
+
+    const center = HUB_CENTERS[roomId] || HUB_CENTERS[systemId];
+    if (!center) return;
+
+    const config = {
+      id: repairId,
+      type: taskType,
+      title: INFRA_TITLES[systemId] || `Repair ${systemId}`,
+      roomId,
+      location: INFRA_LABELS[systemId] || roomId,
+      triggerPosition: [...center],
+    };
+
+    // Add type-specific config
+    if (taskType === 'qte') {
+      config.keyCount = 6;
+      config.timeLimit = 7;
+    } else if (taskType === 'holdsteady') {
+      config.duration = 6;
+    }
+
+    const task = this._createTask(config);
+    if (task) {
+      this.tasks[repairId] = task;
+      this._taskList.push(task);
+      task.placeTrigger();
     }
   }
 
@@ -139,6 +247,10 @@ export class TaskManager {
       if (task.state === TaskState.PENDING || task.state === TaskState.FAILED) {
         task.updateHighlight(dt, playerPos);
       }
+      // Update transport preview (egg hatching) while pending
+      if (task.updatePreview && task._previewCart) {
+        task.updatePreview(dt);
+      }
     }
   }
 
@@ -152,5 +264,73 @@ export class TaskManager {
 
   isTaskActive() {
     return this._taskList.some(t => t.state === TaskState.ACTIVE);
+  }
+
+  resetAll() {
+    // 1. Abort any active task (cleans up cart, overlays, key handlers)
+    for (const task of this._taskList) {
+      if (task.state === TaskState.ACTIVE) {
+        task.abort();
+      }
+    }
+
+    // 2. Remove all triggers from all listed tasks
+    for (const task of this._taskList) {
+      task.removeTrigger();
+    }
+
+    // 3. Remove dynamic tasks (glass repairs + infra repairs)
+    const dynamicIds = Object.keys(this.tasks).filter(id =>
+      id.startsWith('repair_') || id.startsWith('infra_repair_')
+    );
+    for (const id of dynamicIds) {
+      this.tasks[id].removeTrigger();
+      delete this.tasks[id];
+    }
+
+    // 4. Reset static tasks to PENDING with original trigger positions (no triggers placed)
+    for (const config of TASK_CONFIGS) {
+      const task = this.tasks[config.id];
+      if (task) {
+        task.removeTrigger();
+        task.state = TaskState.PENDING;
+        task.triggerPosition = [...config.triggerPosition];
+        // Clean up placed item sprites from fetch tasks
+        if (task.cleanupPlacedSprite) task.cleanupPlacedSprite();
+      }
+    }
+
+    // 5. Clear task list — NightManager controls what appears
+    this._taskList = [];
+  }
+
+  setActiveTasks(taskIds) {
+    // Remove all triggers first
+    for (const task of this._taskList) {
+      task.removeTrigger();
+    }
+
+    // Rebuild list with only matching tasks, place their triggers
+    this._taskList = [];
+    for (const id of taskIds) {
+      const task = this.tasks[id];
+      if (task) {
+        task.state = TaskState.PENDING;
+        task.placeTrigger();
+        this._taskList.push(task);
+      }
+    }
+  }
+
+  addActiveTasks(taskIds) {
+    // Add tasks to the existing list without clearing it
+    for (const id of taskIds) {
+      const task = this.tasks[id];
+      if (task && !this._taskList.includes(task)) {
+        task.state = TaskState.PENDING;
+        task.placeTrigger();
+        this._taskList.push(task);
+      }
+    }
   }
 }
