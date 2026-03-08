@@ -10,7 +10,7 @@ export const HealthState = Object.freeze({
   DEAD: 'dead',
 });
 
-const KNOCKBACK_FORCE = 12;
+const KNOCKBACK_FORCE = 6;
 const HEAL_SAFE_DURATION = 15;
 
 export class DamageSystem {
@@ -35,7 +35,7 @@ export class DamageSystem {
    * @param {object} creaturePos - {x, z}
    * @returns {'hit'|'kill'|'dead'} result of the hit
    */
-  onHit(creaturePos) {
+  onHit(creaturePos, tamaId) {
     if (this.state === HealthState.DEAD) return 'dead';
 
     const player = this.game.player;
@@ -74,11 +74,11 @@ export class DamageSystem {
       // Red flash
       this._hitFlash.classList.add('active');
 
-      // Freeze player (temporary until death screen is implemented)
+      // Freeze player
       player.movementEnabled = false;
       player.mouseLookEnabled = false;
 
-      this.game.emit('player:died', {});
+      this.game.emit('player:died', { tamaId });
       return 'kill';
     }
 

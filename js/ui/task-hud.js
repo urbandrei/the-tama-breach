@@ -32,15 +32,45 @@ export class TaskHUD {
     document.getElementById('ui-root').appendChild(this._notifEl);
     this._notifTimer = 0;
 
+    // Device hint (bottom-left, fades after 10s)
+    this._hintEl = document.createElement('div');
+    this._hintEl.id = 'device-hint';
+    this._hintEl.textContent = 'LOOK DOWN or [TAB] to open device';
+    document.getElementById('ui-root').appendChild(this._hintEl);
+    this._hintTimer = 0;
+
+    // Center-screen message (for errors like missing items)
+    this._centerMsgEl = document.createElement('div');
+    this._centerMsgEl.id = 'center-message';
+    document.getElementById('ui-root').appendChild(this._centerMsgEl);
+    this._centerMsgTimer = 0;
+
     // Listen for infra events
     game.on('infra:down', (data) => this._showNotification(`${data.label} OFFLINE`, 'warn'));
     game.on('infra:up', (data) => this._showNotification(`${data.label} ONLINE`, 'ok'));
+
+    // Show device hint when night begins
+    game.on('elevator:arrived', () => this._showDeviceHint());
+
+    // Center-screen error messages
+    game.on('ui:center-message', (data) => this._showCenterMessage(data.text));
   }
 
   _showNotification(text, type = 'warn') {
     this._notifEl.textContent = text;
     this._notifEl.className = `visible ${type}`;
     this._notifTimer = 3.5;
+  }
+
+  _showDeviceHint() {
+    this._hintTimer = 10;
+    this._hintEl.classList.add('visible');
+  }
+
+  _showCenterMessage(text) {
+    this._centerMsgEl.textContent = text;
+    this._centerMsgEl.classList.add('visible');
+    this._centerMsgTimer = 3;
   }
 
   update(dt) {
@@ -58,6 +88,22 @@ export class TaskHUD {
       this._notifTimer -= dt;
       if (this._notifTimer <= 0) {
         this._notifEl.className = '';
+      }
+    }
+
+    // Device hint timer
+    if (this._hintTimer > 0) {
+      this._hintTimer -= dt;
+      if (this._hintTimer <= 0) {
+        this._hintEl.classList.remove('visible');
+      }
+    }
+
+    // Center message timer
+    if (this._centerMsgTimer > 0) {
+      this._centerMsgTimer -= dt;
+      if (this._centerMsgTimer <= 0) {
+        this._centerMsgEl.classList.remove('visible');
       }
     }
 
@@ -88,11 +134,13 @@ export class TaskHUD {
       }
     }
 
-    // Otherwise point to next pending task
+    // Otherwise point to highest-priority pending task
     if (targetLabel === undefined) {
-      const nextTask = this.game.taskManager._taskList.find(t =>
+      const pendingTasks = this.game.taskManager._taskList.filter(t =>
         (t.state === 'pending' || t.state === 'failed') && t.shouldShowOnMap()
       );
+      pendingTasks.sort((a, b) => a.getPriority() - b.getPriority());
+      const nextTask = pendingTasks[0] || null;
 
       if (!nextTask || !nextTask.triggerPosition) {
         this._container.classList.remove('visible');

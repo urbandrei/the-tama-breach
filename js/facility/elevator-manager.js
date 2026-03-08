@@ -49,6 +49,7 @@ export class ElevatorManager {
     // Linger timer — how long player has been inside elevator at bottom
     this._lingerTimer = 0;
     this._quitTriggered = false;
+    this._departTriggered = false;
   }
 
   init() {
@@ -86,6 +87,7 @@ export class ElevatorManager {
     this._deliveryMode = false;
     this._lingerTimer = 0;
     this._quitTriggered = false;
+    this._departTriggered = false;
 
     // Lock elevator room door until arrival
     if (this._roomDoor) this._roomDoor.lock();
@@ -118,6 +120,28 @@ export class ElevatorManager {
     this.state = ElevatorState.IDLE_BOTTOM;
 
     // Unlock room door so player can enter
+    if (this._roomDoor) this._roomDoor.unlock();
+  }
+
+  /** Open doors for end-of-night return (D2). */
+  /** Close doors immediately (player is inside, ending night). */
+  closeDoors() {
+    this._departTriggered = true;
+    this.state = ElevatorState.DOORS_CLOSING;
+  }
+
+  openDoorsForReturn() {
+    // Snap platform to bottom, doors open
+    this._platformY = 0;
+    if (this._platform) this._platform.position.y = 0;
+    this._doorSlide = DOOR_SLIDE_MAX;
+    this._updateDoors();
+    this._deliveryMode = false;
+    this._quitTriggered = false;
+    this._lingerTimer = 0;
+    this.state = ElevatorState.IDLE_BOTTOM;
+
+    // Unlock room door
     if (this._roomDoor) this._roomDoor.unlock();
   }
 
@@ -250,8 +274,8 @@ export class ElevatorManager {
   }
 
   _animateDoorsClose(dt) {
-    // If player steps back in before doors finish closing (and not quitting), reopen
-    if (!this._quitTriggered && this._isPlayerInside()) {
+    // If player steps back in before doors finish closing (and not quitting/departing), reopen
+    if (!this._quitTriggered && !this._departTriggered && this._isPlayerInside()) {
       this.state = ElevatorState.DOORS_OPENING;
       this._rushMode = false; // normal speed reopen
       return;

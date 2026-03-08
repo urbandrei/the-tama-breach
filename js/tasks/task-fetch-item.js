@@ -34,10 +34,9 @@ const ITEM_SPRITES = {
   },
   toy: {
     lines: [
-      '  /\\  ',
-      ' /  \\ ',
-      ' \\TOY/',
-      '  \\/  ',
+      ' .--. ',
+      '( ** )',
+      ' `--\' ',
     ],
     color: '#cc44cc',
     label: 'Toy',
@@ -55,14 +54,18 @@ export class TaskFetchItem extends TaskBase {
     this._itemSprite = null;
     this._droppedPosition = null;
     this._dropTrigger = null;
-    this._destTrigger = null;
+    this._destTriggers = [];
     this._keyHandler = null;
 
-    // Glass front info for destination trigger placement (set by NightManager)
+    // Single-destination glass front info (set by NightManager via setDestinationRoom)
     this._destRoomId = null;
     this._destGlassZ = null;
     this._destGlassFacing = null;
     this._destRoomCenterX = null;
+
+    // Multi-destination support
+    this._destinations = []; // array of {tamaId, roomId, position, glassFront, roomCenterX}
+    this._completedTamaId = null; // set on completion for NightManager
 
     // Placed item sprite (persists after completion)
     this._placedSprite = null;
@@ -74,7 +77,24 @@ export class TaskFetchItem extends TaskBase {
   }
 
   getEscortTarget() {
+    if (this._destinations.length > 0) {
+      return this._getNearestDestination();
+    }
     return { x: this._destinationPosition.x, z: this._destinationPosition.z };
+  }
+
+  _getNearestDestination() {
+    const px = this.game.player.position.x;
+    const pz = this.game.player.position.z;
+    let nearest = this._destinations[0];
+    let nearestDist = Infinity;
+    for (const dest of this._destinations) {
+      const dx = dest.position[0] - px;
+      const dz = dest.position[2] - pz;
+      const d = dx * dx + dz * dz;
+      if (d < nearestDist) { nearestDist = d; nearest = dest; }
+    }
+    return { x: nearest.position[0], z: nearest.position[2] };
   }
 
   setDestination(x, y, z) {
@@ -87,13 +107,35 @@ export class TaskFetchItem extends TaskBase {
     this._destGlassFacing = glassFront.facing;
   }
 
+  /** Set multiple valid deposit destinations. Each: {tamaId, roomId, position:[x,y,z], glassFront, roomCenterX} */
+  setMultipleDestinations(dests) {
+    this._destinations = dests;
+    if (dests.length > 0) {
+      const first = dests[0];
+      this._destinationPosition.set(...first.position);
+      if (first.glassFront && first.roomCenterX != null) {
+        this._destRoomCenterX = first.roomCenterX;
+        this._destGlassZ = first.glassFront.z;
+        this._destGlassFacing = first.glassFront.facing;
+      }
+    }
+  }
+
+  /** Add an additional destination to an already-configured task. */
+  addDestination(dest) {
+    this._destinations.push(dest);
+  }
+
   shouldShowOnMap() {
     if (this.state === 'active') return true;
     return super.shouldShowOnMap();
   }
 
   get _mapPosition() {
-    if (this._carrying) return { x: this._destinationPosition.x, z: this._destinationPosition.z };
+    if (this._carrying) {
+      if (this._destinations.length > 0) return this._getNearestDestination();
+      return { x: this._destinationPosition.x, z: this._destinationPosition.z };
+    }
     if (this._droppedPosition) return { x: this._droppedPosition.x, z: this._droppedPosition.z };
     return this._propWorldPos || null;
   }
@@ -108,6 +150,7 @@ export class TaskFetchItem extends TaskBase {
 
     this.state = TaskState.ACTIVE;
     this._carrying = true;
+    this._completedTamaId = null;
     this.game.player.isCarryingItem = true;
 
     // Hide interact prompt
@@ -129,10 +172,22 @@ export class TaskFetchItem extends TaskBase {
     // Add Q key handler for drop
     this._addKeyHandler();
 
-    // Create destination trigger
-    this._createDestTrigger();
+    // Create destination trigger(s)
+    this._createDestTriggers();
 
     this.game.emit('task:started', { taskId: this.id, type: this.type, roomId: this.roomId });
+  }
+
+  _completeAtDestination(dest) {
+    // Store which destination was used
+    this._completedTamaId = dest.tamaId;
+    // Use this destination's room info for habitat placement
+    if (dest.glassFront && dest.roomCenterX != null) {
+      this._destRoomCenterX = dest.roomCenterX;
+      this._destGlassZ = dest.glassFront.z;
+      this._destGlassFacing = dest.glassFront.facing;
+    }
+    this.complete();
   }
 
   complete() {
@@ -143,13 +198,19 @@ export class TaskFetchItem extends TaskBase {
     this.game.player.isCarryingItem = false;
     this._removeKeyHandler();
     this._removeDropTrigger();
-    this._removeDestTrigger();
+    this._removeDestTriggers();
     this.removeTrigger();
 
     // Place item sprite inside the habitat instead of removing it
     this._placeItemInHabitat();
 
-    this.game.emit('task:completed', { taskId: this.id, type: this.type, roomId: this.roomId, itemType: this._itemType });
+    this.game.emit('task:completed', {
+      taskId: this.id,
+      type: this.type,
+      roomId: this.roomId,
+      itemType: this._itemType,
+      tamaId: this._completedTamaId,
+    });
   }
 
   abort() {
@@ -160,7 +221,7 @@ export class TaskFetchItem extends TaskBase {
     this._removeKeyHandler();
     this._removeItemSprite();
     this._removeDropTrigger();
-    this._removeDestTrigger();
+    this._removeDestTriggers();
     this.state = TaskState.PENDING;
 
     // Reset trigger to source position
@@ -177,6 +238,12 @@ export class TaskFetchItem extends TaskBase {
       this._placedSprite.dispose();
       this._placedSprite = null;
     }
+  }
+
+  /** Clear multi-destination state (called on night reset). */
+  clearDestinations() {
+    this._destinations = [];
+    this._completedTamaId = null;
   }
 
   update(dt) {
@@ -270,8 +337,8 @@ export class TaskFetchItem extends TaskBase {
       sprite.position.set(pos.x, DROP_HEIGHT, pos.z);
     }
 
-    // Remove destination trigger while dropped
-    this._removeDestTrigger();
+    // Remove destination triggers while dropped
+    this._removeDestTriggers();
 
     // Create pickup trigger at drop location
     this._createDropTrigger();
@@ -321,8 +388,8 @@ export class TaskFetchItem extends TaskBase {
       this.game.camera.add(sprite);
     }
 
-    // Re-add destination trigger
-    this._createDestTrigger();
+    // Re-add destination triggers
+    this._createDestTriggers();
 
     // Re-add key handler if needed
     this._addKeyHandler();
@@ -335,41 +402,96 @@ export class TaskFetchItem extends TaskBase {
     if (prompt) prompt.classList.remove('visible');
   }
 
-  // --- Destination trigger ---
+  // --- Destination triggers ---
 
-  _createDestTrigger() {
-    this._removeDestTrigger();
+  _createDestTriggers() {
+    this._removeDestTriggers();
 
     const info = ITEM_SPRITES[this._itemType];
+    const promptText = `[E] Place ${info ? info.label.toLowerCase() : 'item'}`;
 
-    // If we have glass front info, place trigger on observation side of glass
-    if (this._destGlassZ != null && this._destRoomCenterX != null) {
-      const offset = this._destGlassFacing === 'south' ? -1.0 : 1.0;
-      const triggerZ = this._destGlassZ + offset;
-
-      const geo = new THREE.BoxGeometry(8, 2, 2);
-      const mat = new THREE.MeshBasicMaterial({ visible: false });
-      this._destTrigger = new THREE.Mesh(geo, mat);
-      this._destTrigger.position.set(this._destRoomCenterX, 1.0, triggerZ);
+    if (this._destinations.length > 0) {
+      // Multi-destination mode
+      for (const dest of this._destinations) {
+        const trigger = this._buildDestTrigger(dest, promptText);
+        this._destTriggers.push(trigger);
+      }
     } else {
-      // Fallback: large box at destination center
+      // Single-destination backward-compat
+      const trigger = this._buildSingleDestTrigger(promptText);
+      this._destTriggers.push(trigger);
+    }
+  }
+
+  _buildDestTrigger(dest, promptText) {
+    let trigger;
+    if (dest.glassFront && dest.roomCenterX != null) {
+      const offset = dest.glassFront.facing === 'south' ? -2.0 : 2.0;
+      const triggerZ = dest.glassFront.z + offset;
+      const geo = new THREE.BoxGeometry(8, 2, 4);
+      const mat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+      trigger = new THREE.Mesh(geo, mat);
+      trigger.position.set(dest.roomCenterX, 1.0, triggerZ);
+    } else {
       const geo = new THREE.BoxGeometry(4, 3, 4);
       const mat = new THREE.MeshBasicMaterial({ visible: false });
-      this._destTrigger = new THREE.Mesh(geo, mat);
-      this._destTrigger.position.set(
+      trigger = new THREE.Mesh(geo, mat);
+      trigger.position.set(dest.position[0], 1.5, dest.position[2]);
+    }
+
+    trigger.userData.interactable = {
+      promptText,
+      interact: () => this._completeAtDestination(dest),
+    };
+    trigger.userData._checkCondition = () => this._carrying;
+
+    this.game.scene.add(trigger);
+    this.game.player.interaction.addInteractable(trigger);
+    return trigger;
+  }
+
+  _buildSingleDestTrigger(promptText) {
+    let trigger;
+    if (this._destGlassZ != null && this._destRoomCenterX != null) {
+      const offset = this._destGlassFacing === 'south' ? -2.0 : 2.0;
+      const triggerZ = this._destGlassZ + offset;
+      const geo = new THREE.BoxGeometry(8, 2, 4);
+      const mat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
+      trigger = new THREE.Mesh(geo, mat);
+      trigger.position.set(this._destRoomCenterX, 1.0, triggerZ);
+    } else {
+      const geo = new THREE.BoxGeometry(4, 3, 4);
+      const mat = new THREE.MeshBasicMaterial({ visible: false });
+      trigger = new THREE.Mesh(geo, mat);
+      trigger.position.set(
         this._destinationPosition.x, 1.5, this._destinationPosition.z
       );
     }
 
-    this._destTrigger.userData.interactable = {
-      promptText: `[E] Place ${info ? info.label.toLowerCase() : 'item'}`,
+    trigger.userData.interactable = {
+      promptText,
       interact: () => this.complete(),
     };
-    // Only show prompt when carrying
-    this._destTrigger.userData._checkCondition = () => this._carrying;
+    trigger.userData._checkCondition = () => this._carrying;
 
-    this.game.scene.add(this._destTrigger);
-    this.game.player.interaction.addInteractable(this._destTrigger);
+    this.game.scene.add(trigger);
+    this.game.player.interaction.addInteractable(trigger);
+    return trigger;
+  }
+
+  _removeDestTriggers() {
+    for (const trigger of this._destTriggers) {
+      this.game.player.interaction.removeInteractable(trigger);
+      this.game.scene.remove(trigger);
+      trigger.geometry.dispose();
+      trigger.material.dispose();
+    }
+    this._destTriggers = [];
+  }
+
+  // Backward compat alias
+  _removeDestTrigger() {
+    this._removeDestTriggers();
   }
 
   // --- Place item in habitat ---
@@ -410,14 +532,5 @@ export class TaskFetchItem extends TaskBase {
     // Transfer sprite to placed reference (persists in scene)
     this._placedSprite = this._itemSprite;
     this._itemSprite = null;
-  }
-
-  _removeDestTrigger() {
-    if (!this._destTrigger) return;
-    this.game.player.interaction.removeInteractable(this._destTrigger);
-    this.game.scene.remove(this._destTrigger);
-    this._destTrigger.geometry.dispose();
-    this._destTrigger.material.dispose();
-    this._destTrigger = null;
   }
 }

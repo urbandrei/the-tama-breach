@@ -144,18 +144,16 @@ export class InfrastructureManager {
       tama.needs.thirstDecayMultiplier = waterUp ? 0.5 : 2.0;
     }
 
-    // Generator: blackout + panic mode
+    // Generator: sustained flicker + panic mode (no full blackout)
     const genUp = this.systems.generator_room.operational;
-    if (!genUp) {
-      this.game.lightingManager?.goBlackout('generator');
-      for (const tama of tamas) {
-        tama.needs.panicMode = true;
+    const lm = this.game.lightingManager;
+    if (lm) {
+      for (const entry of lm.lights) {
+        lm.setAgitatedFlicker(entry.roomId, !genUp);
       }
-    } else {
-      this.game.lightingManager?.restoreBlackout('generator');
-      for (const tama of tamas) {
-        tama.needs.panicMode = false;
-      }
+    }
+    for (const tama of tamas) {
+      tama.needs.panicMode = !genUp;
     }
 
     // Server room: effect handled by tama-tab.js checking operational state

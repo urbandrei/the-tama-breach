@@ -1,4 +1,4 @@
-import { rooms, hallways } from '../facility/layout-data.js';
+import { rooms, hallways, doorways } from '../facility/layout-data.js';
 
 /**
  * Auto-generates a waypoint navigation graph from facility layout data.
@@ -60,25 +60,59 @@ export function buildNavGraph() {
     addEdge(startIdx, midIdx);
     addEdge(midIdx, endIdx);
 
-    // Connect hallway endpoints to nearest room center
-    // Hallway endpoints sit at room walls, so find which room is closest
-    const startRoom = findNearestRoom(sx, sz);
-    const endRoom = findNearestRoom(ex, ez);
-
-    if (startRoom !== null) {
-      addEdge(startIdx, roomNodeMap.get(startRoom));
-    }
-    if (endRoom !== null) {
-      addEdge(endIdx, roomNodeMap.get(endRoom));
-    }
   }
 
-  // 3. Connect nearby hallway endpoints (handles L-joint corners and ring continuity)
+  // 3. Doorway waypoints — connect rooms to hallways through their doors
+  const allHallNodeIndices = [];
+  for (const hall of hallways) {
+    allHallNodeIndices.push(nodeMap.get(`${hall.id}_start`));
+    allHallNodeIndices.push(nodeMap.get(`${hall.id}_mid`));
+    allHallNodeIndices.push(nodeMap.get(`${hall.id}_end`));
+  }
+
+  const roomsById = {};
+  for (const room of rooms) roomsById[room.id] = room;
+
+  for (const door of doorways) {
+    const room = roomsById[door.roomId];
+    if (!room) continue;
+
+    const [cx, cz] = room.center;
+    const [w, h] = room.size;
+    let doorX, doorZ;
+    switch (door.wallSide) {
+      case 'west':  doorX = cx - w / 2; doorZ = cz + (door.position || 0); break;
+      case 'east':  doorX = cx + w / 2; doorZ = cz + (door.position || 0); break;
+      case 'north': doorX = cx + (door.position || 0); doorZ = cz + h / 2; break;
+      case 'south': doorX = cx + (door.position || 0); doorZ = cz - h / 2; break;
+    }
+
+    const doorIdx = addNode(`door_${door.roomId}`, doorX, doorZ);
+
+    // Connect door to room center
+    const roomIdx = roomNodeMap.get(door.roomId);
+    if (roomIdx !== undefined) addEdge(doorIdx, roomIdx);
+
+    // Connect door to nearest hallway node
+    let bestHallIdx = -1;
+    let bestDist = Infinity;
+    for (const hallIdx of allHallNodeIndices) {
+      const d = dist(doorX, doorZ, nodes[hallIdx].x, nodes[hallIdx].z);
+      if (d < bestDist) {
+        bestDist = d;
+        bestHallIdx = hallIdx;
+      }
+    }
+    if (bestHallIdx >= 0) addEdge(doorIdx, bestHallIdx);
+  }
+
+  // 4. Connect nearby hallway endpoints (handles L-joint corners and ring continuity)
   // Hallway endpoints that are geographically close should be linked
   const PROXIMITY_THRESHOLD = 3.0;
   const hallNodeIds = [];
   for (const hall of hallways) {
     hallNodeIds.push(nodeMap.get(`${hall.id}_start`));
+    hallNodeIds.push(nodeMap.get(`${hall.id}_mid`));
     hallNodeIds.push(nodeMap.get(`${hall.id}_end`));
   }
   for (let i = 0; i < hallNodeIds.length; i++) {
@@ -86,7 +120,7 @@ export function buildNavGraph() {
       const a = nodes[hallNodeIds[i]];
       const b = nodes[hallNodeIds[j]];
       const d = dist(a.x, a.z, b.x, b.z);
-      if (d > 0.01 && d < PROXIMITY_THRESHOLD) {
+      if (d < PROXIMITY_THRESHOLD) {
         addEdge(hallNodeIds[i], hallNodeIds[j]);
       }
     }
@@ -100,34 +134,6 @@ export function buildNavGraph() {
   }
 
   return { nodes, edges, adjacency };
-}
-
-/**
- * Find which room a point is closest to (by checking if it's near a room's boundary).
- * Hallway endpoints sit at room walls, so the nearest room center wins.
- */
-function findNearestRoom(x, z) {
-  let bestId = null;
-  let bestDist = Infinity;
-
-  for (const room of rooms) {
-    const [cx, cz] = room.center;
-    const [w, h] = room.size;
-
-    // Check if point is near this room's boundary (within a small margin)
-    const halfW = w / 2 + 2; // small margin for hallway connections
-    const halfH = h / 2 + 2;
-
-    if (Math.abs(x - cx) <= halfW && Math.abs(z - cz) <= halfH) {
-      const d = dist(x, z, cx, cz);
-      if (d < bestDist) {
-        bestDist = d;
-        bestId = room.id;
-      }
-    }
-  }
-
-  return bestId;
 }
 
 /**

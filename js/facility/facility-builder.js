@@ -99,7 +99,6 @@ export class FacilityBuilder {
       const door = new Door(doorX, doorZ, dw.wallSide, this.game);
       this.game.scene.add(door.group);
       this.game.physics.addColliders(this._worldColliders(door.group, door.colliders));
-      this.game.player.interaction.addInteractable(door.trigger);
       this.doors.push(door);
       this.doorsByRoom[dw.roomId] = door;
     }
@@ -152,9 +151,12 @@ export class FacilityBuilder {
           this.elevatorShaft = result.group.userData;
         }
 
-        // Capture camera LED refs
+        // Capture camera prop refs (LED + full group for highlighting)
         if (result.group.userData.cameraLed) {
-          this.cameraProps[roomData.id] = result.group.userData.cameraLed;
+          this.cameraProps[roomData.id] = {
+            led: result.group.userData.cameraLed,
+            group: result.group,
+          };
         }
 
         // Capture habitat extensions for tamagotchi system

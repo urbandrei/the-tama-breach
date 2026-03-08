@@ -2,7 +2,7 @@ export const NIGHT_CONFIGS = [
   {
     night: 1,
     title: 'NIGHT 1',
-    briefing: 'First shift. Transport Nibbles to containment.\nComplete basic facility checks.',
+    briefing: 'First shift. Transport Specimen Nibbles to containment.\nComplete basic facility checks.',
     taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate'],
     taskInterval: [45, 75],
     nightDuration: 540, // 9 min
@@ -25,8 +25,8 @@ export const NIGHT_CONFIGS = [
   {
     night: 2,
     title: 'NIGHT 2',
-    briefing: 'Void has arrived. Two specimens to monitor.\nStay alert.',
-    taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate'],
+    briefing: 'Specimen Void has arrived. Two specimens to monitor.\nStay alert.',
+    taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate', 'food_sorting'],
     taskInterval: [40, 65],
     nightDuration: 540,
     activeTamas: ['nibbles', 'void'],
@@ -49,8 +49,8 @@ export const NIGHT_CONFIGS = [
   {
     night: 3,
     title: 'NIGHT 3',
-    briefing: 'Glitch is unstable. Screens may lie.\nWatch the containment glass.',
-    taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate'],
+    briefing: 'Specimen Glitch is unstable. Screens may lie.\nWatch the containment glass.',
+    taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate', 'food_sorting'],
     taskInterval: [35, 55],
     nightDuration: 570, // 9.5 min
     activeTamas: ['nibbles', 'void', 'glitch'],
@@ -74,8 +74,8 @@ export const NIGHT_CONFIGS = [
   {
     night: 4,
     title: 'NIGHT 4',
-    briefing: 'Feral has been captured. Full containment.\nDo not let them out.',
-    taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate'],
+    briefing: 'Specimen Feral has been captured. Full containment.\nDo not let them out.',
+    taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate', 'food_sorting'],
     taskInterval: [30, 50],
     nightDuration: 570,
     activeTamas: ['nibbles', 'void', 'glitch', 'feral'],
@@ -99,8 +99,8 @@ export const NIGHT_CONFIGS = [
   {
     night: 5,
     title: 'NIGHT 5',
-    briefing: 'Final shift. All specimens agitated.\nSurvive until dawn.',
-    taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate'],
+    briefing: 'Final shift. All specimens are agitated.\nSurvive until dawn.',
+    taskPool: ['electrical_qte', 'server_wires', 'water_pipes', 'storage_calibrate', 'food_sorting'],
     taskInterval: [25, 40],
     nightDuration: 600, // 10 min
     activeTamas: ['nibbles', 'void', 'glitch', 'feral'],

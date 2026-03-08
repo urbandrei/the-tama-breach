@@ -96,6 +96,11 @@ export class PlayerController {
     this._applyGravity(dt);
     this._applyHeight(dt);
 
+    // Strafe tilt
+    const strafeLeft = this.input.isKeyDown(keybindings.getKey('move_left')) || this.input.isKeyDown('ArrowLeft');
+    const strafeRight = this.input.isKeyDown(keybindings.getKey('move_right')) || this.input.isKeyDown('ArrowRight');
+    this.cameraEffects.setStrafeTilt((strafeRight ? 1 : 0) - (strafeLeft ? 1 : 0));
+
     this.cameraEffects.update(dt, this._moveSpeed, this._isSprinting, this._isCrouching, this._isGrounded);
     this.flashlight.update(this.input, dt);
     this.interaction.update(dt);
@@ -112,7 +117,7 @@ export class PlayerController {
   }
 
   _handleMovement(dt) {
-    if (!this.movementEnabled) {
+    if (!this.movementEnabled || this.deviceOpen) {
       this._velocity.set(0, 0, 0);
       this._moveSpeed = 0;
       return;

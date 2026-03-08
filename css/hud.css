@@ -92,6 +92,54 @@
   border: 1px solid rgba(0, 255, 65, 0.2);
 }
 
+/* Device hint (bottom-left) */
+#device-hint {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  color: #00ff41;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+  background: rgba(0, 0, 0, 0.5);
+  padding: 5px 10px;
+  border: 1px solid rgba(0, 255, 65, 0.15);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+#device-hint.visible {
+  opacity: 0.7;
+}
+
+/* Center-screen message (error/info) */
+#center-message {
+  position: fixed;
+  top: 45%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #ff4444;
+  text-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
+  background: rgba(40, 0, 0, 0.7);
+  padding: 10px 20px;
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+}
+
+#center-message.visible {
+  opacity: 1;
+}
+
 /* HUD Minimap */
 #hud-minimap {
   position: fixed;
@@ -105,3 +153,155 @@
   display: block;
   image-rendering: pixelated;
 }
+
+/* Clock-out HUD (D1) */
+#clock-out-hud {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  color: #ff4444;
+  text-shadow: 0 0 12px rgba(255, 68, 68, 0.6);
+  z-index: 20;
+  pointer-events: none;
+}
+#clock-out-hud.flash {
+  animation: clockFlash 0.8s infinite;
+}
+@keyframes clockFlash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Charging bar (B4) */
+#charge-bar {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  border-radius: 2px;
+  z-index: 20;
+  overflow: hidden;
+}
+#charge-bar .charge-fill {
+  height: 100%;
+  width: 0%;
+  background: #00ff41;
+  transition: width 0.3s;
+}
+#charge-bar .charge-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 7px;
+  line-height: 16px;
+  color: #000;
+  pointer-events: none;
+}
+
+/* === DEATH SCREEN (H1) === */
+.death-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Press Start 2P', monospace;
+}
+
+.death-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  animation: deathFlash 0.2s ease-out forwards;
+}
+
+@keyframes deathFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.death-specimen {
+  color: #ff3333;
+  font-size: 16px;
+  text-align: center;
+  line-height: 1.2;
+  text-shadow: 0 0 20px rgba(255, 51, 51, 0.8);
+  animation: deathZoom 0.8s ease-out;
+  white-space: pre;
+}
+
+@keyframes deathZoom {
+  0% { transform: scale(3); opacity: 0; }
+  30% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.death-static-full {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.1;
+  white-space: pre;
+  text-align: center;
+}
+
+.death-black {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  animation: deathFade 0.4s ease-in forwards;
+}
+
+@keyframes deathFade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.death-retry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 40px 60px;
+  border: 2px solid #ff3333;
+}
+
+.death-title {
+  font-size: 20px;
+  color: #ff3333;
+  text-shadow: 0 0 16px rgba(255, 51, 51, 0.6);
+  letter-spacing: 6px;
+}
+
+.death-msg {
+  font-size: 8px;
+  color: #aa2222;
+}
+
+.death-btn {
+  padding: 12px 32px;
+  background: none;
+  border: 2px solid #ff3333;
+  color: #ff3333;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.death-btn:hover {
+  background: rgba(255, 51, 51, 0.15);
+}
+
+/* Wound / hit overlay styles are in proximity.css */

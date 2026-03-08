@@ -1,0 +1,20 @@
+Title: Polish pass — all bugs squashed
+TL;DR: Fixed all remaining bugs from the bug list — device hints, missing item errors, task priority, generator lighting, and sign readability.
+---
+Bug fixes:
+- Main menu camera no longer drifts after dying — pitch resets properly so the elevator view matches the night intro
+- Trying to feed/water/play a creature without the item now closes the device and shows a clear red error message in the center of the screen telling you what's missing
+- Generator failure no longer plunges the facility into full darkness — lights flicker intermittently instead, keeping things tense without making it unplayable
+- Room signs stay green during containment breaches instead of turning red — much easier to navigate when things go wrong
+
+New features:
+- "LOOK DOWN or [TAB] to open device" hint appears in the bottom-left when you arrive each night, fades after 10 seconds
+- Device remembers which tab you had open — close and reopen and you're right back where you were
+- Back button on device apps is bigger and says "< BACK" instead of a tiny [X]
+- Tasks now have priority ordering — transport and glass repair show up first, fetch tasks second, infrastructure third. The directional arrow always points to the most urgent task
+- Highest priority task gets a circle around its dot on the minimap so you can spot it instantly
+- Lure moved from floating in the middle of the storage room to sitting on a shelf where it belongs
+- Doors no longer show "Press E" prompts — they open and close automatically by proximity only, feels much smoother
+- Security cameras only fail in containment rooms that actually have a creature in them — no more pointless repair trips to empty rooms
+- Toy sprite is now a ball instead of a diamond shape
+- Fixed not being able to drop items or repair glass when standing too close to the containment glass wall — trigger zones are deeper now

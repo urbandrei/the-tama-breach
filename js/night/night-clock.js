@@ -27,6 +27,10 @@ export class NightClock {
     return this._elapsed >= this._nightDuration;
   }
 
+  getRemainingSeconds() {
+    return Math.max(0, this._nightDuration - this._elapsed);
+  }
+
   get elapsed() {
     return this._elapsed;
   }

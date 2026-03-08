@@ -7,6 +7,9 @@ const BASE_FAIL_INTERVAL = [60, 180]; // seconds before a camera can fail
 const GRACE_PERIOD = 90; // seconds before cameras start failing
 const REPAIR_HOLD_DURATION = 3.0; // seconds to hold E
 
+const HIGHLIGHT_FADE_FAR = 15;
+const HIGHLIGHT_FADE_NEAR = 5;
+
 export class CameraSystem {
   constructor(game) {
     this.game = game;
@@ -15,22 +18,30 @@ export class CameraSystem {
     this._graceTimer = GRACE_PERIOD;
     this._difficultyScale = 1.0;
     this._repairTriggers = {}; // roomId -> trigger mesh
+    this._activeRooms = new Set(CONTAINMENT_ROOMS); // rooms with creatures
 
     // Initialize per-room camera state
     for (const roomId of CONTAINMENT_ROOMS) {
       this.cameras[roomId] = {
         operational: true,
         failTimer: this._randomInterval(),
-        propLed: null, // set by facility builder after props are created
+        propLed: null,
+        propGroup: null,
+        highlightEdges: [],
+        highlightMeshes: [],
       };
     }
   }
 
-  /** Set LED mesh references from camera props. */
+  /** Set LED mesh + prop group references from camera props. */
   setCameraProps(cameraProps) {
-    for (const [roomId, led] of Object.entries(cameraProps)) {
-      if (this.cameras[roomId]) {
-        this.cameras[roomId].propLed = led;
+    for (const [roomId, ref] of Object.entries(cameraProps)) {
+      if (!this.cameras[roomId]) continue;
+      if (ref.led) {
+        this.cameras[roomId].propLed = ref.led;
+      }
+      if (ref.group) {
+        this.cameras[roomId].propGroup = ref.group;
       }
     }
   }
@@ -40,15 +51,32 @@ export class CameraSystem {
     return cam ? cam.operational : true; // non-camera rooms always "up"
   }
 
-  activate(difficultyScale = 1.0) {
+  /** Returns positions of offline cameras for minimap dots. */
+  getOfflineCameraPositions() {
+    const result = [];
+    for (const [roomId, cam] of Object.entries(this.cameras)) {
+      if (cam.operational) continue;
+      const trigger = this._repairTriggers[roomId];
+      if (trigger) {
+        result.push({ roomId, x: trigger.position.x, z: trigger.position.z });
+      }
+    }
+    return result;
+  }
+
+  activate(difficultyScale = 1.0, occupiedRoomIds = null) {
     this._active = true;
     this._difficultyScale = difficultyScale;
     this._graceTimer = GRACE_PERIOD;
+    this._activeRooms = occupiedRoomIds
+      ? new Set(occupiedRoomIds)
+      : new Set(CONTAINMENT_ROOMS);
 
-    for (const cam of Object.values(this.cameras)) {
+    for (const [roomId, cam] of Object.entries(this.cameras)) {
       cam.operational = true;
       cam.failTimer = this._randomInterval();
       this._setLedColor(cam, true);
+      this._removeHighlight(cam);
     }
 
     // Remove any leftover repair triggers
@@ -58,16 +86,20 @@ export class CameraSystem {
   deactivate() {
     this._active = false;
     this._removeAllTriggers();
+    for (const cam of Object.values(this.cameras)) {
+      this._removeHighlight(cam);
+    }
   }
 
   reset() {
     this._active = false;
     this._graceTimer = GRACE_PERIOD;
 
-    for (const cam of Object.values(this.cameras)) {
+    for (const [roomId, cam] of Object.entries(this.cameras)) {
       cam.operational = true;
       cam.failTimer = this._randomInterval();
       this._setLedColor(cam, true);
+      this._removeHighlight(cam);
     }
 
     this._removeAllTriggers();
@@ -82,11 +114,15 @@ export class CameraSystem {
     }
 
     for (const [roomId, cam] of Object.entries(this.cameras)) {
-      if (!cam.operational) continue;
-
-      cam.failTimer -= dt;
-      if (cam.failTimer <= 0) {
-        this._takeOffline(roomId);
+      if (!this._activeRooms.has(roomId)) continue;
+      if (cam.operational) {
+        cam.failTimer -= dt;
+        if (cam.failTimer <= 0) {
+          this._takeOffline(roomId);
+        }
+      } else {
+        // Update highlight fade based on player distance
+        this._updateHighlight(cam);
       }
     }
   }
@@ -98,6 +134,9 @@ export class CameraSystem {
 
     // Place repair trigger in the room
     this._placeRepairTrigger(roomId);
+
+    // Add green highlight to camera prop
+    this._createHighlight(cam);
 
     this.game.emit('camera:down', { roomId });
   }
@@ -113,6 +152,9 @@ export class CameraSystem {
     // Remove repair trigger
     this._removeRepairTrigger(roomId);
 
+    // Remove green highlight
+    this._removeHighlight(cam);
+
     this.game.emit('camera:up', { roomId });
   }
 
@@ -126,8 +168,6 @@ export class CameraSystem {
     const [, d] = roomData.size;
 
     // Place trigger near the camera (opposite side from glass wall)
-    // contain_a/b: glass on north, camera on south wall → trigger at south
-    // contain_c/d: glass on south, camera on north wall → trigger at north
     const isNorth = roomId === 'contain_a' || roomId === 'contain_b';
     const triggerZ = isNorth ? cz - d / 2 + 1.5 : cz + d / 2 - 1.5;
 
@@ -169,6 +209,79 @@ export class CameraSystem {
     const color = operational ? 0x00ff44 : 0xff2222;
     cam.propLed.material.color.setHex(color);
     cam.propLed.material.emissive.setHex(color);
+  }
+
+  // --- Green highlight (same pattern as TaskBase) ---
+
+  _createHighlight(cam) {
+    if (cam.highlightEdges.length > 0) return; // already active
+    const group = cam.propGroup;
+    if (!group) return;
+
+    group.traverse((child) => {
+      if (!child.isMesh) return;
+      if (!child.material || !child.material.visible) return;
+
+      // Clone material for emissive tinting
+      const origMat = child.material;
+      child.material = origMat.clone();
+      cam.highlightMeshes.push({ mesh: child, original: origMat });
+
+      // Edge lines
+      const edgesGeo = new THREE.EdgesGeometry(child.geometry);
+      const edgesMat = new THREE.LineBasicMaterial({
+        color: 0x00ff41,
+        transparent: true,
+        opacity: 0,
+      });
+      const lines = new THREE.LineSegments(edgesGeo, edgesMat);
+      lines.raycast = () => {};
+      child.add(lines);
+      cam.highlightEdges.push(lines);
+    });
+  }
+
+  _removeHighlight(cam) {
+    for (const lines of cam.highlightEdges) {
+      if (lines.parent) lines.parent.remove(lines);
+      lines.geometry.dispose();
+      lines.material.dispose();
+    }
+    cam.highlightEdges = [];
+
+    for (const { mesh, original } of cam.highlightMeshes) {
+      if (mesh.material && mesh.material !== original) {
+        mesh.material.dispose();
+      }
+      mesh.material = original;
+    }
+    cam.highlightMeshes = [];
+  }
+
+  _updateHighlight(cam) {
+    if (cam.highlightEdges.length === 0) return;
+
+    const px = this.game.player.position.x;
+    const pz = this.game.player.position.z;
+    const group = cam.propGroup;
+    if (!group) return;
+
+    const _pos = new THREE.Vector3();
+    group.getWorldPosition(_pos);
+    const dx = _pos.x - px;
+    const dz = _pos.z - pz;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    const fade = Math.max(0, Math.min(1, (HIGHLIGHT_FADE_FAR - dist) / (HIGHLIGHT_FADE_FAR - HIGHLIGHT_FADE_NEAR)));
+
+    for (const { mesh } of cam.highlightMeshes) {
+      if (mesh.material && mesh.material.emissive) {
+        mesh.material.emissive.setHex(0x00ff41);
+        mesh.material.emissiveIntensity = 0.15 * fade;
+      }
+    }
+    for (const lines of cam.highlightEdges) {
+      lines.material.opacity = 0.6 * fade;
+    }
   }
 
   _randomInterval() {

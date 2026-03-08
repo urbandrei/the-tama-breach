@@ -48,11 +48,31 @@ const TASK_CONFIGS = [
   {
     id: 'checkin_command',
     type: 'holdsteady',
-    title: 'Check in at command center',
+    title: 'Clock in',
     roomId: 'command_center',
     location: 'Command Center',
     triggerPosition: [-19.25, 1.4, -5],
-    duration: 4,
+    duration: 1,
+  },
+  {
+    id: 'food_sorting',
+    type: 'qte',
+    title: 'Sort food supply crates',
+    roomId: 'food_processing',
+    location: 'Food Processing',
+    triggerPosition: [5, 1.4, 7],
+    keyCount: 7,
+    timeLimit: 9,
+  },
+  {
+    id: 'restock_supplies',
+    type: 'qte',
+    title: 'Process supply order',
+    roomId: 'storage',
+    location: 'Storage',
+    triggerPosition: [19.25, 1.4, -7],
+    keyCount: 6,
+    timeLimit: 10,
   },
   {
     id: 'transport_specimen',
@@ -295,8 +315,9 @@ export class TaskManager {
         task.removeTrigger();
         task.state = TaskState.PENDING;
         task.triggerPosition = [...config.triggerPosition];
-        // Clean up placed item sprites from fetch tasks
+        // Clean up placed item sprites and multi-destination state from fetch tasks
         if (task.cleanupPlacedSprite) task.cleanupPlacedSprite();
+        if (task.clearDestinations) task.clearDestinations();
       }
     }
 

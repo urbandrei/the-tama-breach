@@ -70,55 +70,26 @@ export class Door {
     this.group.add(this._panelCollider);
     this.colliders.push(this._panelCollider);
 
-    // Interaction trigger zone (invisible, wider than door)
-    // DoubleSide so raycasts register even when camera is inside the volume
-    this._trigger = new THREE.Mesh(
-      new THREE.BoxGeometry(DOOR_WIDTH + 1.0, DOOR_HEIGHT, 2.0),
-      new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
-    );
-    this._trigger.position.set(0, DOOR_HEIGHT / 2, 0);
-    this._trigger.userData.interactable = {
-      promptText: '[E] Open Door',
-      interact: () => this.toggle(),
-    };
-    this.group.add(this._trigger);
-  }
-
-  get trigger() {
-    return this._trigger;
   }
 
   lock() {
     this.locked = true;
     this.close();
-    this._trigger.userData.interactable.promptText = '[LOCKED]';
   }
 
   unlock() {
     this.locked = false;
-    this._trigger.userData.interactable.promptText = '[E] Open Door';
-  }
-
-  toggle() {
-    if (this.locked) return;
-    if (this._targetOpen < 0.5) {
-      this.open();
-    } else {
-      this.close();
-    }
   }
 
   open() {
     if (this.locked) return;
     this._targetOpen = 1;
     this._autoCloseTimer = AUTO_CLOSE_TIME;
-    this._trigger.userData.interactable.promptText = '[E] Close Door';
     this._emitNoise();
   }
 
   close() {
     this._targetOpen = 0;
-    this._trigger.userData.interactable.promptText = this.locked ? '[LOCKED]' : '[E] Open Door';
     this._emitNoise();
   }
 
@@ -132,6 +103,21 @@ export class Door {
   }
 
   update(dt) {
+    // Proximity auto-open
+    if (this.game && !this.locked) {
+      const pp = this.game.player.position;
+      const dx = pp.x - this.group.position.x;
+      const dz = pp.z - this.group.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist < 2.5 && this._targetOpen < 0.5) {
+        this.open();
+      }
+      if (dist < 3.0 && this._targetOpen > 0.5) {
+        this._autoCloseTimer = AUTO_CLOSE_TIME;
+      }
+    }
+
     // Auto-close timer
     if (this._targetOpen > 0.5 && this._autoCloseTimer > 0) {
       this._autoCloseTimer -= dt;

@@ -41,19 +41,20 @@ export class Interaction {
     const hits = this._raycaster.intersectObjects(this.interactables, false);
 
     if (hits.length > 0) {
-      const hit = hits[0];
-      const interactable = hit.object.userData.interactable;
-      if (interactable) {
-        // Skip if condition check fails (e.g. player doesn't have required item)
-        const condition = hit.object.userData._checkCondition;
-        if (typeof condition === 'function' && !condition()) {
-          this._currentTarget = null;
-          this._holdTarget = null;
-          this._holdTimer = 0;
-          this._hidePrompt();
-          return;
-        }
+      // Find first hit whose condition passes
+      let hit = null;
+      let interactable = null;
+      for (const h of hits) {
+        const ia = h.object.userData.interactable;
+        if (!ia) continue;
+        const condition = h.object.userData._checkCondition;
+        if (typeof condition === 'function' && !condition()) continue;
+        hit = h;
+        interactable = ia;
+        break;
+      }
 
+      if (hit && interactable) {
         this._currentTarget = { object: hit.object, data: interactable };
 
         // Hold-to-interact mode

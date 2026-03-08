@@ -116,10 +116,11 @@ export class Tamagotchi {
     this.billboardSprite.setPosition(this._currentX, SPRITE_Y, this._currentZ);
     // Sprite NOT added to scene here — stays hidden until delivered
 
-    // Glass repair interaction trigger — on observation side of glass
+    // Glass repair — trigger box + make glass panels interactable (C3)
     this._createRepairTrigger(chamberInfo);
+    this._makeGlassInteractable(chamberInfo);
 
-    // Physical care triggers — on observation side of glass, bypasses server
+    // Physical care triggers — wall-mounted buttons (C1)
     this._createCareTriggers(chamberInfo);
   }
 
@@ -128,14 +129,14 @@ export class Tamagotchi {
     if (!gf) return;
 
     // Position trigger on the player side of the glass
-    const offset = gf.facing === 'south' ? -1.0 : 1.0;
+    const offset = gf.facing === 'south' ? -2.0 : 2.0;
     const triggerX = chamberInfo.group.position.x;
     const triggerZ = gf.z + offset;
 
-    const geo = new THREE.BoxGeometry(2.0, 1.6, 0.8);
-    const mat = new THREE.MeshBasicMaterial({ visible: false });
+    const geo = new THREE.BoxGeometry(8.0, 3.0, 4.0);
+    const mat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
     this._repairTrigger = new THREE.Mesh(geo, mat);
-    this._repairTrigger.position.set(triggerX, 0.8, triggerZ);
+    this._repairTrigger.position.set(triggerX, 1.2, triggerZ);
 
     this._repairTrigger.userData.interactable = {
       promptText: '[E] Repair Glass',
@@ -151,26 +152,108 @@ export class Tamagotchi {
     this.game.player.interaction.addInteractable(this._repairTrigger);
   }
 
+  /** Make glass panels themselves interactable for repair (C3). */
+  _makeGlassInteractable(chamberInfo) {
+    if (!chamberInfo.glassPanels || chamberInfo.glassPanels.length === 0) return;
+    for (const panel of chamberInfo.glassPanels) {
+      panel.userData.interactable = {
+        promptText: '[E] Repair Glass',
+        interact: () => {
+          this.containment.repairPartial(GLASS_REPAIR_AMOUNT);
+        },
+      };
+      panel.userData._checkCondition = () => {
+        return this.delivered && this.state !== TamaState.ESCAPED && this.containment.glassHealth < 100;
+      };
+      this.game.player.interaction.addInteractable(panel);
+    }
+  }
+
   _createCareTriggers(chamberInfo) {
     const gf = chamberInfo.glassFront;
     if (!gf) return;
 
-    const offset = gf.facing === 'south' ? -1.0 : 1.0;
     const baseX = chamberInfo.group.position.x;
-    const triggerZ = gf.z + offset;
+    const roomHalfW = 7.5; // containment rooms are 15 wide
+
+    // Right side of glass from player's perspective (facing the glass):
+    // glass faces south → player faces north → right = +X → wall at -X side
+    // glass faces north → player faces south → right = -X → wall at +X side
+    const isGlassSouth = gf.facing === 'south';
+    const wallX = baseX + (isGlassSouth ? -roomHalfW : roomHalfW);
+    const wallInset = isGlassSouth ? 0.15 : -0.15; // offset from wall into room
+    const groupRotY = isGlassSouth ? Math.PI / 2 : -Math.PI / 2; // face into room
+
+    // Buttons spaced along Z on the observation (player) side of the glass
+    const zDir = isGlassSouth ? -1 : 1;
+    const zBase = gf.z + zDir * 0.5;
 
     const actions = [
-      { name: 'FEED', label: '[E] Feed', xOff: -3, itemKey: 'food' },
-      { name: 'WATER', label: '[E] Change Water', xOff: 0, itemKey: 'water' },
-      { name: 'PLAY', label: '[E] Give Toy', xOff: 3, itemKey: 'toy' },
+      { name: 'FEED', label: '[E] Feed', sign: 'FEED', zOff: 0, itemKey: 'food', color: 0xdd8833 },
+      { name: 'WATER', label: '[E] Change Water', sign: 'WATER', zOff: 0.8, itemKey: 'water', color: 0x5588cc },
+      { name: 'PLAY', label: '[E] Give Toy', sign: 'PLAY', zOff: 1.6, itemKey: 'toy', color: 0xcc44cc },
     ];
 
     for (const action of actions) {
+      const group = new THREE.Group();
+      group.position.set(wallX + wallInset, 0, zBase + action.zOff * zDir);
+      group.rotation.y = groupRotY;
+
+      // Back plate (grey square)
+      const plateMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.7, metalness: 0.5 });
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.05), plateMat);
+      plate.position.y = 1.2;
+      plate.position.z = -0.02;
+      group.add(plate);
+
+      // Circular red button jutting out of the plate
+      const btnMat = new THREE.MeshStandardMaterial({
+        color: 0xff1111,
+        emissive: 0xff2222,
+        emissiveIntensity: 0.6,
+        roughness: 0.2,
+        metalness: 0.4,
+      });
+      const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 16), btnMat);
+      btn.rotation.x = Math.PI / 2;
+      btn.position.y = 1.2;
+      btn.position.z = 0.03;
+      group.add(btn);
+
+      // Sign above button (canvas texture, same style as room signs)
+      const signCanvas = document.createElement('canvas');
+      signCanvas.width = 128;
+      signCanvas.height = 32;
+      const sctx = signCanvas.getContext('2d');
+      sctx.fillStyle = '#0a1a0a';
+      sctx.fillRect(0, 0, 128, 32);
+      sctx.font = '12px "Press Start 2P", monospace';
+      sctx.fillStyle = '#00ff41';
+      sctx.textAlign = 'center';
+      sctx.textBaseline = 'middle';
+      sctx.fillText(action.sign, 64, 16);
+      const signTex = new THREE.CanvasTexture(signCanvas);
+      signTex.minFilter = THREE.LinearFilter;
+      signTex.magFilter = THREE.LinearFilter;
+      const signMat = new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        emissive: 0x00ff41,
+        emissiveIntensity: 0.8,
+        emissiveMap: signTex,
+        transparent: true,
+      });
+      const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.2), signMat);
+      signMesh.position.y = 1.65;
+      signMesh.position.z = 0.01;
+      group.add(signMesh);
+
+      // Invisible interaction box (larger for easier raycasting)
       const trigger = new THREE.Mesh(
-        new THREE.BoxGeometry(1.5, 1.6, 0.8),
+        new THREE.BoxGeometry(0.8, 0.8, 0.5),
         new THREE.MeshBasicMaterial({ visible: false })
       );
-      trigger.position.set(baseX + action.xOff, 0.8, triggerZ);
+      trigger.position.y = 1.2;
+      group.add(trigger);
 
       const actionName = action.name;
       const itemKey = action.itemKey;
@@ -187,9 +270,13 @@ export class Tamagotchi {
           !this.needs.isOnCooldown(actionName);
       };
 
-      this.game.scene.add(trigger);
+      // Store ref for dimming when unavailable
+      trigger.userData._btnMat = btnMat;
+      trigger.userData._activeColor = action.color;
+
+      this.game.scene.add(group);
       this.game.player.interaction.addInteractable(trigger);
-      this._careTriggers.push(trigger);
+      this._careTriggers.push({ group, trigger, btnMat, activeColor: action.color, itemKey, actionName });
     }
   }
 
@@ -248,6 +335,16 @@ export class Tamagotchi {
     // 4. Movement
     if (this._spriteAdded && this.state !== TamaState.ESCAPED) {
       this._updateMovement(dt);
+    }
+
+    // 4b. Update care button visuals (C1)
+    for (const ct of this._careTriggers) {
+      const available = this.delivered &&
+        this._enclosureItems[ct.itemKey] &&
+        this.state !== TamaState.ESCAPED &&
+        !this.needs.isOnCooldown(ct.actionName);
+      ct.btnMat.emissiveIntensity = available ? 0.3 : 0.0;
+      ct.btnMat.color.setHex(available ? ct.activeColor : 0x333333);
     }
 
     // 5. Sprite animation + facing direction
@@ -337,7 +434,7 @@ export class Tamagotchi {
     this.showInChamber();
     this.active = true;
 
-    this.game.emit('tama:hatched', { tamaId: this.id, roomId: this.personality.roomId });
+    this.game.emit('specimen:hatched', { tamaId: this.id, roomId: this.personality.roomId });
   }
 
   showInChamber() {
@@ -500,12 +597,17 @@ export class Tamagotchi {
         this._randomBangTimeLeft = RANDOM_BANG_DURATION;
         this._moveState = 'charging';
 
+        // 15% chance to break a random placed item (C2)
+        if (Math.random() < 0.15) {
+          this._breakRandomItem();
+        }
+
         // Visual feedback — agitated look during bang
         this.billboardSprite.setDirectionalAnimation(this.personality.sprite.agitated, '#ff4444', 0.3);
         this.billboardSprite.setGlitch(0.2);
 
         // Emit thud event + nearby camera shake
-        this.game.emit('tama:bang', {
+        this.game.emit('specimen:bang', {
           tamaId: this.id,
           roomId: this.personality.roomId,
           position: { x: this._currentX, z: this._currentZ },
@@ -549,7 +651,7 @@ export class Tamagotchi {
       this.game.lightingManager.setAgitatedFlicker(this.personality.roomId, true);
     }
 
-    this.game.emit('tama:agitated', {
+    this.game.emit('specimen:agitated', {
       tamaId: this.id,
       roomId: this.personality.roomId,
     });
@@ -567,7 +669,7 @@ export class Tamagotchi {
       this.game.lightingManager.setAgitatedFlicker(this.personality.roomId, false);
     }
 
-    this.game.emit('tama:calmed', {
+    this.game.emit('specimen:calmed', {
       tamaId: this.id,
       roomId: this.personality.roomId,
     });
@@ -591,6 +693,15 @@ export class Tamagotchi {
     if (this.game.player && this.game.player.cameraEffects) {
       this.game.player.cameraEffects.shake(0.12, 1.5);
     }
+  }
+
+  /** Break a random placed item during a bang episode (C2). */
+  _breakRandomItem() {
+    const placed = Object.entries(this._enclosureItems).filter(([, v]) => v);
+    if (placed.length === 0) return;
+    const [itemType] = placed[Math.floor(Math.random() * placed.length)];
+    this._enclosureItems[itemType] = false;
+    this.game.emit('item:broken', { tamaId: this.id, itemType, roomId: this.personality.roomId });
   }
 
   careAction(actionName) {
@@ -625,6 +736,7 @@ export class Tamagotchi {
         WATER: this.needs.isOnCooldown('WATER'),
         PLAY: this.needs.isOnCooldown('PLAY'),
       },
+      eggStage: this._eggStage,
     };
   }
 

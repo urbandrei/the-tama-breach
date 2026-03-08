@@ -19,8 +19,14 @@ export const PLAYER_STAMINA_REGEN_DELAY = 1.0;
 
 // Mouse
 export const MOUSE_SENSITIVITY = 0.002;
-export const PITCH_MIN = -Math.PI / 2 + 0.01;
+export const PITCH_MIN = -Math.PI / 3;          // -60° (looking all the way down opens device)
 export const PITCH_MAX = Math.PI / 2 - 0.01;
+
+// Device look-down open
+export const DEVICE_OPEN_PITCH = -Math.PI / 3;       // pitch that triggers device open
+export const DEVICE_REARM_PITCH = -Math.PI / 3 + 0.01; // essentially immediate re-arm
+export const DEVICE_CLOSE_BUFFER_PX = 30;             // px above device top edge to trigger close
+export const DEVICE_OPEN_COOLDOWN = 0.05;             // brief grace period after close
 
 // Camera
 export const CAMERA_FOV = 75;

@@ -26,6 +26,10 @@ export class CameraEffects {
     // Landing impact
     this._landingDip = 0;
     this._landingRecovery = 0;
+
+    // Strafe tilt
+    this._tiltTarget = 0;
+    this._tiltCurrent = 0;
   }
 
   onJump() {
@@ -44,23 +48,30 @@ export class CameraEffects {
     this._shakeFrequency = frequency;
   }
 
+  setStrafeTilt(strafeDir) {
+    this._tiltTarget = strafeDir * 0.015; // subtle tilt: -1=left, 0=none, 1=right
+  }
+
   update(dt, moveSpeed, isSprinting, isCrouching, isGrounded) {
     this._updateHeadBob(dt, moveSpeed, isSprinting, isGrounded);
     this._updateFOV(dt, isSprinting, isCrouching);
     this._updateShake(dt);
     this._updateLanding(dt);
 
+    // Strafe tilt
+    this._tiltCurrent = dampedLerp(this._tiltCurrent, this._tiltTarget, 8, dt);
+
     // Apply offsets to camera position
     this.camera.position.y = this._bobOffsetY + this._landingDip;
     this.camera.position.x = this._bobOffsetX;
 
-    // Apply shake to camera rotation
+    // Apply shake + tilt to camera rotation
     if (this._shakeTimer < this._shakeDuration) {
       const decay = 1 - (this._shakeTimer / this._shakeDuration);
       const t = this._shakeTimer * this._shakeFrequency;
-      this.camera.rotation.z = Math.sin(t * 1.1) * this._shakeIntensity * decay * 0.5;
+      this.camera.rotation.z = Math.sin(t * 1.1) * this._shakeIntensity * decay * 0.5 + this._tiltCurrent;
     } else {
-      this.camera.rotation.z = dampedLerp(this.camera.rotation.z, 0, 10, dt);
+      this.camera.rotation.z = dampedLerp(this.camera.rotation.z, this._tiltCurrent, 10, dt);
     }
   }
 

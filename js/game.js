@@ -56,6 +56,7 @@ export class Game {
     this.infrastructureManager = null;
     this.cameraSystem = null;
     this.dustParticles = null;
+    this.proximityEffects = null;
 
     // Clock
     this._clock = new THREE.Clock();
@@ -84,6 +85,14 @@ export class Game {
     if (!list) return;
     const idx = list.indexOf(callback);
     if (idx !== -1) list.splice(idx, 1);
+  }
+
+  once(event, callback) {
+    const wrapper = (data) => {
+      this.off(event, wrapper);
+      callback(data);
+    };
+    this.on(event, wrapper);
   }
 
   emit(event, data) {
@@ -116,8 +125,8 @@ export class Game {
   }
 
   _update(dt) {
-    // Elevator animates during intro, gameplay, and quit ascent (DEATH while ascending)
-    if (this.elevatorManager && (this.state === GameState.NIGHT_INTRO || this.state === GameState.PLAYING || this.state === GameState.DEVICE_OPEN || this.state === GameState.TASK_ACTIVE || this.state === GameState.DEATH)) {
+    // Elevator animates during menu (band loop), intro, gameplay, and quit ascent
+    if (this.elevatorManager && (this.state === GameState.MENU || this.state === GameState.NIGHT_INTRO || this.state === GameState.PLAYING || this.state === GameState.DEVICE_OPEN || this.state === GameState.TASK_ACTIVE || this.state === GameState.DEATH)) {
       this.elevatorManager.update(dt);
     }
 
@@ -135,6 +144,7 @@ export class Game {
       if (this.dustParticles) this.dustParticles.update(dt);
       if (this.taskHUD) this.taskHUD.update(dt);
       if (this.hudMinimap) this.hudMinimap.update(dt);
+      if (this.proximityEffects) this.proximityEffects.update(dt);
     }
   }
 

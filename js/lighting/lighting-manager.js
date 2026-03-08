@@ -176,15 +176,13 @@ export class LightingManager {
       this._edgeStrips.setIntensity(this._blackoutProgress * 0.6);
     }
 
-    // Toggle alert color on navigation aids during blackout
+    // Toggle alert color on edge strips during blackout (signs stay green for readability)
     if (this._blackoutReasons.size > 0 && !this._alertActive) {
       this._alertActive = true;
       if (this._edgeStrips) this._edgeStrips.setAlert(true);
-      if (this._roomSigns) this._roomSigns.setAlert(true);
     } else if (this._blackoutReasons.size === 0 && this._alertActive) {
       this._alertActive = false;
       if (this._edgeStrips) this._edgeStrips.setAlert(false);
-      if (this._roomSigns) this._roomSigns.setAlert(false);
     }
 
     for (const entry of this.lights) {

@@ -8,8 +8,15 @@ import { PERSONALITIES } from '../tamagotchi/personality.js';
 import { TamaState } from '../tamagotchi/personality.js';
 import { rooms } from '../facility/layout-data.js';
 
+const LURE_SPRITE_LINES = [
+  '  /\\  ',
+  ' |==| ',
+  ' |><| ',
+  '  \\/  ',
+];
+
 const SPRITE_Y = 1.0;
-const LURE_POSITION = [19.25, 1.4, -5]; // Storage room center
+const LURE_POSITION = [21.5, 1.1, -4]; // On shelf in storage room
 const SPRINT_NOISE_INTERVAL = 2.0;
 
 // State → color mapping
@@ -49,6 +56,9 @@ export class CreatureManager {
     this.hasLure = false;
     this._lureTrigger = null;
     this._lurePlaceTriggers = new Map(); // roomId → mesh
+
+    // Lure highlight state (B3)
+    this._lureHighlight = null;
 
     // Create the lure pickup in storage room
     this._createLurePickup();
@@ -118,6 +128,9 @@ export class CreatureManager {
       if (currentState === CreatureState.CHASE) {
         anyChasing = true;
       }
+
+      // Open doors when creature walks near them
+      this._creatureOpenDoors(creature.ai);
 
       // Update state-based colors on state change
       if (prevState !== currentState) {
@@ -199,8 +212,9 @@ export class CreatureManager {
     spotlight.target = spotlightTarget;
     this.game.scene.add(spotlight);
 
-    // Create AI
-    const ai = new CreatureAI(this.graph, personality, spawnX, spawnZ);
+    // Create AI (pass doors for detection occlusion)
+    const doors = this.game.facility ? this.game.facility.doors : [];
+    const ai = new CreatureAI(this.graph, personality, spawnX, spawnZ, doors);
 
     this.creatures.set(tamaId, {
       personality,
@@ -215,6 +229,9 @@ export class CreatureManager {
     this._createLurePlaceTrigger(tamaId, personality.roomId);
 
     this.game.emit('creature:spawned', { tamaId, roomId: personality.roomId });
+
+    // Show lure highlight when any creature is escaped (B3)
+    this._updateLureHighlight();
   }
 
   despawnCreature(tamaId) {
@@ -271,10 +288,22 @@ export class CreatureManager {
     this._emitNoise(data.x, data.z);
   }
 
+  _creatureOpenDoors(ai) {
+    if (!this.game.facility) return;
+    for (const door of this.game.facility.doors) {
+      if (door._targetOpen > 0.5 || door.locked) continue;
+      const dx = ai.x - door.group.position.x;
+      const dz = ai.z - door.group.position.z;
+      if (dx * dx + dz * dz < 2.5 * 2.5) {
+        door.open();
+      }
+    }
+  }
+
   _onCreatureHit(tamaId, ai) {
     const player = this.game.player;
     const playerPos = { x: player.position.x, z: player.position.z };
-    const result = this.damageSystem.onHit({ x: ai.x, z: ai.z });
+    const result = this.damageSystem.onHit({ x: ai.x, z: ai.z }, tamaId);
     if (result === 'hit' || result === 'kill') {
       // Creature freezes after hitting (stores player pos to resume chase)
       ai.freeze(playerPos);
@@ -307,12 +336,63 @@ export class CreatureManager {
       tamaId,
       roomId: creature.personality.roomId,
     });
+
+    // Update lure highlight (B3)
+    this._updateLureHighlight();
   }
 
   // --- Lure system ---
 
+  /** Returns lure info for minimap dot placement. */
+  getLureMapInfo() {
+    if (!this._anyActiveCreature()) return null;
+
+    if (!this.hasLure) {
+      // Show pickup location
+      const [x, , z] = LURE_POSITION;
+      return { type: 'pickup', x, z };
+    } else {
+      // Show deposit location (first active creature's room)
+      for (const [, creature] of this.creatures) {
+        if (creature.returned) continue;
+        const center = ROOM_CENTERS[creature.personality.roomId];
+        if (center) return { type: 'deposit', x: center.x, z: center.z };
+      }
+    }
+    return null;
+  }
+
+  /** Escort interface for minimap pathfinding line. */
+  get isLureEscortActive() {
+    return this.hasLure && this._anyActiveCreature();
+  }
+
+  getLureEscortTarget() {
+    for (const [, creature] of this.creatures) {
+      if (creature.returned) continue;
+      const center = ROOM_CENTERS[creature.personality.roomId];
+      if (center) return { x: center.x, z: center.z };
+    }
+    return null;
+  }
+
+  _anyActiveCreature() {
+    for (const [, c] of this.creatures) {
+      if (!c.returned) return true;
+    }
+    return false;
+  }
+
   _createLurePickup() {
     const [x, y, z] = LURE_POSITION;
+
+    // Billboard sprite for the lure
+    this._lureSprite = new BillboardSprite(LURE_SPRITE_LINES, '#00ff41');
+    this._lureSprite.setPosition(x, y, z);
+    this._lureSprite.sprite.scale.multiplyScalar(0.5);
+    this.game.scene.add(this._lureSprite.sprite);
+
+    // Invisible trigger for interaction
     this._lureTrigger = new THREE.Mesh(
       new THREE.BoxGeometry(0.8, 1.6, 0.8),
       new THREE.MeshBasicMaterial({ visible: false }),
@@ -322,6 +402,8 @@ export class CreatureManager {
       promptText: '[E] Take lure',
       interact: () => this._takeLure(),
     };
+    // Only interactable when a specimen has escaped (A6)
+    this._lureTrigger.userData._checkCondition = () => this._anyActiveCreature();
     this.game.scene.add(this._lureTrigger);
     this.game.player.interaction.addInteractable(this._lureTrigger);
   }
@@ -329,7 +411,10 @@ export class CreatureManager {
   _takeLure() {
     this.hasLure = true;
 
-    // Remove the trigger temporarily
+    // Hide the sprite + trigger
+    if (this._lureSprite) {
+      this.game.scene.remove(this._lureSprite.sprite);
+    }
     if (this._lureTrigger) {
       this.game.player.interaction.removeInteractable(this._lureTrigger);
       this.game.scene.remove(this._lureTrigger);
@@ -341,6 +426,9 @@ export class CreatureManager {
   }
 
   _respawnLurePickup() {
+    if (this._lureSprite) {
+      this.game.scene.add(this._lureSprite.sprite);
+    }
     if (this._lureTrigger) {
       this.game.scene.add(this._lureTrigger);
       this.game.player.interaction.addInteractable(this._lureTrigger);
@@ -418,5 +506,32 @@ export class CreatureManager {
 
   isCreatureActive(tamaId) {
     return this.creatures.has(tamaId) && !this.creatures.get(tamaId).returned;
+  }
+
+  /** Add/remove pulsing green highlight on the lure pickup (B3). */
+  _updateLureHighlight() {
+    let anyActive = false;
+    for (const [, c] of this.creatures) {
+      if (!c.returned) { anyActive = true; break; }
+    }
+
+    if (anyActive && !this._lureHighlight && this._lureTrigger) {
+      const [x, y, z] = LURE_POSITION;
+      const geo = new THREE.SphereGeometry(0.5, 8, 8);
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x00ff41,
+        transparent: true,
+        opacity: 0.3,
+        wireframe: true,
+      });
+      this._lureHighlight = new THREE.Mesh(geo, mat);
+      this._lureHighlight.position.set(x, y, z);
+      this.game.scene.add(this._lureHighlight);
+    } else if (!anyActive && this._lureHighlight) {
+      this.game.scene.remove(this._lureHighlight);
+      this._lureHighlight.geometry.dispose();
+      this._lureHighlight.material.dispose();
+      this._lureHighlight = null;
+    }
   }
 }

@@ -14,19 +14,19 @@
 
 #device-container.device-visible {
   display: block;
-  animation: deviceOpen 0.3s ease-out forwards;
+  animation: deviceOpen 0.15s ease-out forwards;
 }
 
 #device-container.device-hidden {
   display: block;
-  animation: deviceClose 0.2s ease-in forwards;
+  animation: deviceClose 0.12s ease-in forwards;
   pointer-events: none;
 }
 
 /* CRT power-on: scanline → expand vertically */
 @keyframes deviceOpen {
   0%   { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(49.5% 0 49.5% 0); }
-  40%  { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(49.5% 0 49.5% 0); }
+  15%  { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(49.5% 0 49.5% 0); }
   100% { opacity: 1; transform: translate(-50%, -50%); clip-path: inset(0 0 0 0); }
 }
 
@@ -129,34 +129,89 @@
   animation: blink 1s infinite;
 }
 
-/* === TABS === */
-#device-tabs {
+/* === HOME SCREEN === */
+.device-home {
   display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  height: 100%;
+  flex-wrap: wrap;
+  padding: 20px 10px;
+}
+
+.device-app-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  background: none;
+  border: 1px solid #1a3a1a;
+  color: #00aa2a;
+  font-family: 'Press Start 2P', monospace;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  min-width: 100px;
+}
+
+.device-app-icon:hover,
+.device-app-icon.sc-hover {
+  color: #00ff41;
+  border-color: #00ff41;
+  background: rgba(0, 255, 65, 0.05);
+}
+
+.app-icon-glyph {
+  font-size: 18px;
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+.app-icon-label {
+  font-size: 6px;
+  letter-spacing: 1px;
+}
+
+/* === APP WRAPPER === */
+.device-app-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.device-app-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
   border-bottom: 1px solid #1a3a1a;
+  font-size: 8px;
+  color: #00ff41;
   flex-shrink: 0;
 }
 
-.device-tab {
-  flex: 1;
-  padding: 8px 4px;
+.device-app-close {
   background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: #00aa2a;
+  border: 1px solid #00aa2a;
+  color: #00ff41;
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
+  font-size: 8px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  padding: 5px 12px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.device-tab:hover {
+.device-app-close:hover,
+.device-app-close.sc-hover {
   color: #00ff41;
+  border-color: #00ff41;
+  background: rgba(0, 255, 65, 0.1);
 }
 
-.device-tab.active {
-  color: #00ff41;
-  border-bottom-color: #00ff41;
-  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+.device-app-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
 }
 
 /* === CONTENT AREA === */
@@ -241,6 +296,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
 }
 
 .tama-habitat-canvas {
@@ -337,38 +393,87 @@
   flex-shrink: 0;
 }
 
-/* === ACTION BUTTONS === */
-.tama-actions {
+/* === CARE ITEMS (drag and drop) === */
+.tama-care-items {
+  position: absolute;
+  top: 4px;
+  right: 4px;
   display: flex;
-  gap: 8px;
-  margin-top: 4px;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
 }
 
-.tama-btn {
-  flex: 1;
-  padding: 8px 4px;
+.tama-care-hint {
+  font-size: 5px;
+  color: #00aa2a;
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.tama-care-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
   background: #0a1a0a;
   border: 1px solid #00aa2a;
   color: #00ff41;
   font-family: 'Press Start 2P', monospace;
-  font-size: 7px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  cursor: grab;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  user-select: none;
 }
 
-.tama-btn:hover {
+.tama-care-item:hover,
+.tama-care-item.sc-hover {
   background: rgba(0, 255, 65, 0.1);
   border-color: #00ff41;
+  transform: translateY(-2px);
 }
 
-.tama-btn:active {
-  background: rgba(0, 255, 65, 0.2);
+.tama-care-item:active {
+  cursor: grabbing;
+  transform: scale(0.95);
 }
 
-.tama-btn.cooldown {
+.tama-care-item.cooldown {
   opacity: 0.3;
   pointer-events: none;
   border-color: #1a3a1a;
+  cursor: not-allowed;
+}
+
+.care-icon {
+  font-size: 14px;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+}
+
+.care-label {
+  font-size: 5px;
+  color: #00aa2a;
+}
+
+/* Drag ghost */
+.tama-drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10001;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: #00ff41;
+  text-shadow: 0 0 12px rgba(0, 255, 65, 0.8);
+  background: rgba(0, 15, 0, 0.8);
+  border: 1px solid #00ff41;
+  padding: 4px 8px;
+  transform: translate(-50%, -50%);
+  animation: dragPulse 0.6s infinite;
+}
+
+@keyframes dragPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 255, 65, 0.4); }
+  50% { box-shadow: 0 0 16px rgba(0, 255, 65, 0.8); }
 }
 
 /* === TASKS TAB === */
@@ -388,49 +493,70 @@
 
 .task-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
   padding: 8px;
   border: 1px solid #1a3a1a;
 }
 
-.task-status-icon {
-  font-size: 8px;
-  flex-shrink: 0;
-  width: 24px;
-}
-
-.task-item.task-complete .task-status-icon { color: #00ff41; }
-.task-item.task-active .task-status-icon {
-  color: #ffaa00;
-  animation: blink 1s infinite;
-}
-.task-item.task-pending .task-status-icon { color: #1a3a1a; }
-
-.task-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.task-description {
+.task-type-label {
   font-size: 7px;
-}
-
-.task-item.task-complete .task-description {
   color: #00aa2a;
-  text-decoration: line-through;
 }
-.task-item.task-active .task-description { color: #ffaa00; }
-.task-item.task-pending .task-description { color: #00aa2a; }
 
-.task-room {
+.task-type-status {
   font-size: 6px;
-  color: #0a5a2a;
+  color: #1a3a1a;
+  text-align: right;
+}
+
+.task-item.task-idle {
+  opacity: 0.4;
+}
+
+.task-item.task-idle .task-type-status {
+  color: #1a3a1a;
+}
+
+.task-item.task-pending-type {
+  border-color: #00aa2a;
+}
+
+.task-item.task-pending-type .task-type-label {
+  color: #00ff41;
+}
+
+.task-item.task-pending-type .task-type-status {
+  color: #00aa2a;
 }
 
 .task-item.task-active {
   border-color: #ffaa00;
+  animation: taskPulse 2s infinite;
+}
+
+.task-item.task-active .task-type-label {
+  color: #ffaa00;
+  text-shadow: 0 0 6px rgba(255, 170, 0, 0.4);
+}
+
+.task-item.task-active .task-type-status {
+  color: #ffaa00;
+  animation: blink 1s infinite;
+}
+
+.task-item.task-complete .task-type-label {
+  color: #00aa2a;
+}
+
+.task-item.task-complete .task-type-status {
+  color: #00ff41;
+}
+
+@keyframes taskPulse {
+  0%, 100% { border-color: #ffaa00; }
+  50% { border-color: #aa7700; }
 }
 
 .tasks-summary {
@@ -555,12 +681,12 @@
   animation: blink 0.5s infinite;
 }
 
-/* === SCREEN BACKDROP (mouse clamping) === */
+/* === SCREEN BACKDROP === */
 .screen-backdrop {
   position: fixed;
   inset: 0;
   z-index: 99;
-  cursor: none;
+  cursor: default;
 }
 
 .screen-backdrop.task-backdrop {
@@ -725,6 +851,120 @@
 
 .briefing-btn:active {
   background: rgba(0, 255, 65, 0.2);
+}
+
+/* === SNAKE APP === */
+.snake-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  justify-content: center;
+}
+
+.snake-canvas {
+  border: 1px solid #1a3a1a;
+  image-rendering: pixelated;
+}
+
+.snake-score {
+  font-size: 8px;
+  color: #00ff41;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+/* === MAIN MENU === */
+.device-main-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 24px;
+  text-align: center;
+}
+
+.menu-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.menu-ascii {
+  font-size: 10px;
+  color: #00ff41;
+  text-shadow: 0 0 12px rgba(0, 255, 65, 0.6);
+  letter-spacing: 2px;
+  white-space: pre;
+}
+
+.menu-subtitle {
+  font-size: 6px;
+  color: #00aa2a;
+  margin-top: 6px;
+  letter-spacing: 3px;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.menu-btn {
+  padding: 10px 24px;
+  background: none;
+  border: 1px solid #1a3a1a;
+  color: #00aa2a;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  min-width: 160px;
+}
+
+.menu-btn:hover,
+.menu-btn.sc-hover {
+  color: #00ff41;
+  border-color: #00ff41;
+  background: rgba(0, 255, 65, 0.05);
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+.menu-start {
+  border-color: #00ff41;
+  color: #00ff41;
+}
+
+.menu-footer {
+  font-size: 5px;
+  color: #1a3a1a;
+}
+
+/* === CREDITS === */
+.device-credits {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  text-align: center;
+}
+
+.credits-title {
+  font-size: 12px;
+  color: #00ff41;
+  text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+}
+
+.credits-body {
+  font-size: 7px;
+  color: #00aa2a;
+  line-height: 2;
 }
 
 /* === SOFTWARE CURSOR === */

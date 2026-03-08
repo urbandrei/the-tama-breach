@@ -13,8 +13,10 @@ import { TaskHUD } from './ui/task-hud.js';
 import { CreatureManager } from './ai/creature-manager.js';
 import { NightManager } from './night/night-manager.js';
 import { DustParticles } from './effects/dust-particles.js';
+import { ProximityEffects } from './effects/proximity-effects.js';
 import { SoftwareCursor } from './ui/software-cursor.js';
 import { HudMinimap } from './ui/hud-minimap.js';
+import { DevPanel } from './ui/dev-panel.js';
 
 // Boot
 document.addEventListener('DOMContentLoaded', () => {
@@ -82,6 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // HUD minimap (M key toggle)
     game.hudMinimap = new HudMinimap(game);
 
+    // Proximity effects (per-specimen visual effects when nearby)
+    game.proximityEffects = new ProximityEffects(game);
+
     // Night system (after all other systems)
     const nightManager = new NightManager(game);
     game.nightManager = nightManager;
@@ -94,10 +99,13 @@ document.addEventListener('DOMContentLoaded', () => {
     game.start();
     nightManager.startGame();
 
+    // Dev panel (+ key)
+    new DevPanel(game);
+
     // Expose for debugging
     window.game = game;
 
-    console.log('The Tama Breach - Phase 7 loaded.');
+    console.log('DEEP PEN loaded.');
   } catch (err) {
     console.error('Game failed to initialize:', err);
     document.body.style.background = '#200';

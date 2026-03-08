@@ -1,0 +1,39 @@
+Title: DEEP PEN overhaul — device OS, death screens, and more
+TL;DR: Massive update — new main menu, home screen OS on the device, snake minigame, jumpscare death sequence, proximity effects, and tons of bug fixes and gameplay tweaks.
+---
+Bug fixes:
+- Water bowl is now pickable even when pipe repair task is in the same room
+- Glass repair works from anywhere on the glass wall, not just a tiny trigger point
+- Shelves/props have larger invisible hitboxes so interactions don't miss between gaps
+- Lure only appears interactable when a specimen has actually escaped
+- Minimap escort paths no longer clip through walls
+- If a specimen hatches from the cart while still in the elevator, it now properly spawns next to the cart and walks out — cart stays visible until the creature leaves, then elevator doors close
+
+Gameplay changes:
+- Escaped specimens get faster and more aggressive the longer they're out
+- No tasks spawn in the last minute — time to clock out
+- Lure glows during containment breach so you can find it
+- Charging station shows a progress bar and minimap path when device is dead
+- Specimens can break items in their cage during tantrums — you'll need to re-fetch them
+- Glass repair works by clicking anywhere on the containment glass
+- Visible 3D care buttons on containment room walls (orange=FEED, blue=WATER, purple=PLAY)
+- Clock-out sequence at 5AM — interact with terminal, then get to the elevator before 6AM or it's game over
+- Supply restock task appears periodically in the storage room (night 2+)
+- Food processing room now has its own sorting task
+
+Device overhaul:
+- Device has a proper home screen with app icons instead of tabs
+- Apps open in windows with [X] close button
+- Snake minigame playable on the device (pure time-killer)
+- Task app now shows all task TYPES with ACTIVE/PENDING/IDLE status
+- Care items are drag-and-drop — drag food/water/toys onto the specimen
+
+New features:
+- Main menu on the device at game start — START, SETTINGS, CREDITS
+- Renamed to DEEP PEN throughout
+
+Polish:
+- 5-phase jumpscare death screen: white flash → specimen close-up → TV static → black → retry
+- Each specimen has unique visual effects when nearby: Void darkens vision, Glitch tears the screen, Feral pulses red edges
+- Camera tilts slightly when strafing
+- Strafe tilt for extra immersion

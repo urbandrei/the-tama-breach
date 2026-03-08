@@ -1,22 +1,20 @@
-const STATUS_ICON = {
-  completed: '[X]',
-  active: '[>]',
-  pending: '[ ]',
-  failed: '[ ]',
-};
-
-const STATUS_CLASS = {
-  completed: 'task-complete',
-  active: 'task-active',
-  pending: 'task-pending',
-  failed: 'task-pending',
-};
+// Task type categories shown on device
+const TASK_TYPES = [
+  { key: 'electrical', label: 'ELECTRICAL', ids: ['electrical_qte'] },
+  { key: 'server', label: 'SERVER', ids: ['server_wires'] },
+  { key: 'water', label: 'WATER', ids: ['water_pipes'] },
+  { key: 'storage', label: 'STORAGE', ids: ['storage_calibrate'] },
+  { key: 'transport', label: 'TRANSPORT', ids: ['transport_specimen'] },
+  { key: 'glass', label: 'GLASS REPAIR', pattern: 'repair_' },
+  { key: 'infra', label: 'INFRA REPAIR', pattern: 'infra_repair_' },
+  { key: 'fetch', label: 'FETCH ITEM', ids: ['fetch_food', 'fetch_water', 'fetch_toy'] },
+];
 
 export class TasksTab {
   constructor(game) {
     this.game = game;
     this._el = null;
-    this._taskItems = {};
+    this._rows = {};
     this._summary = null;
     this._list = null;
   }
@@ -27,106 +25,113 @@ export class TasksTab {
     const root = document.createElement('div');
     root.className = 'tasks-tab';
 
-    // Header
     const header = document.createElement('div');
     header.className = 'tasks-header';
-    header.textContent = 'ACTIVE TASKS';
+    header.textContent = 'SYSTEMS';
     root.appendChild(header);
 
-    // Task list
     this._list = document.createElement('div');
     this._list.className = 'tasks-list';
     root.appendChild(this._list);
 
-    // Summary
     this._summary = document.createElement('div');
     this._summary.className = 'tasks-summary';
     root.appendChild(this._summary);
 
     this._el = root;
-    this._rebuildList();
+    this._buildTypeRows();
 
     return root;
   }
 
-  _rebuildList() {
+  _buildTypeRows() {
     if (!this._list) return;
-
     this._list.innerHTML = '';
-    this._taskItems = {};
+    this._rows = {};
 
+    for (const type of TASK_TYPES) {
+      const row = document.createElement('div');
+      row.className = 'task-item task-idle';
+
+      const label = document.createElement('span');
+      label.className = 'task-type-label';
+      label.textContent = type.label;
+
+      const status = document.createElement('span');
+      status.className = 'task-type-status';
+      status.textContent = '---';
+
+      row.appendChild(label);
+      row.appendChild(status);
+      this._list.appendChild(row);
+
+      this._rows[type.key] = { row, status };
+    }
+  }
+
+  _getMatchingTasks(type, tasks) {
+    if (type.ids) {
+      return tasks.filter(t => type.ids.includes(t.id));
+    }
+    if (type.pattern) {
+      return tasks.filter(t => t.id.startsWith(type.pattern));
+    }
+    return [];
+  }
+
+  _updateRows() {
     const mgr = this.game.taskManager;
     if (!mgr) return;
 
     const tasks = mgr.getAllTaskData();
-    let idx = 1;
+    let completed = 0;
+    let total = 0;
 
-    for (const task of tasks) {
-      const row = document.createElement('div');
-      row.className = `task-item ${STATUS_CLASS[task.status]}`;
+    for (const type of TASK_TYPES) {
+      const entry = this._rows[type.key];
+      if (!entry) continue;
 
-      const icon = document.createElement('span');
-      icon.className = 'task-status-icon';
-      icon.textContent = STATUS_ICON[task.status];
+      const matching = this._getMatchingTasks(type, tasks);
 
-      const info = document.createElement('div');
-      info.className = 'task-info';
+      // Find most important status: active > pending > completed > none
+      const active = matching.find(t => t.status === 'active');
+      const pending = matching.find(t => t.status === 'pending');
+      const done = matching.filter(t => t.status === 'completed');
 
-      const title = document.createElement('div');
-      title.className = 'task-description';
-      title.textContent = `${idx}. ${task.title}`;
-
-      const location = document.createElement('div');
-      location.className = 'task-room';
-      location.textContent = task.location;
-
-      info.appendChild(title);
-      info.appendChild(location);
-      row.appendChild(icon);
-      row.appendChild(info);
-      this._list.appendChild(row);
-
-      this._taskItems[task.id] = { row, icon };
-      idx++;
+      if (active) {
+        entry.row.className = 'task-item task-active';
+        const detail = active.location || '';
+        entry.status.textContent = detail ? `ACTIVE [${detail}]` : 'ACTIVE';
+        total++;
+      } else if (pending) {
+        entry.row.className = 'task-item task-pending-type';
+        const detail = pending.location || '';
+        entry.status.textContent = detail ? `PENDING [${detail}]` : 'PENDING';
+        total++;
+      } else if (done.length > 0) {
+        entry.row.className = 'task-item task-complete';
+        entry.status.textContent = 'DONE';
+        total++;
+        completed += done.length;
+      } else {
+        entry.row.className = 'task-item task-idle';
+        entry.status.textContent = '---';
+      }
     }
 
-    this._updateSummary(tasks);
-  }
-
-  _updateSummary(tasks) {
-    if (!this._summary) return;
-    const total = tasks.length;
-    const done = tasks.filter(t => t.status === 'completed').length;
-    this._summary.textContent = `${done}/${total} COMPLETE`;
+    if (this._summary) {
+      const allDone = tasks.filter(t => t.status === 'completed').length;
+      this._summary.textContent = `${allDone}/${tasks.length} COMPLETE`;
+    }
   }
 
   onActivate() {
-    // Rebuild list when tab becomes visible (catches newly created repair tasks)
-    this._rebuildList();
+    this._updateRows();
   }
 
   onDeactivate() {}
 
   update(_dt) {
-    const mgr = this.game.taskManager;
-    if (!mgr) return;
-
-    const tasks = mgr.getAllTaskData();
-
-    for (const task of tasks) {
-      const entry = this._taskItems[task.id];
-      if (!entry) {
-        // New task appeared (e.g. glass repair) — rebuild
-        this._rebuildList();
-        return;
-      }
-
-      // Update status class and icon
-      const newClass = STATUS_CLASS[task.status];
-      entry.row.className = `task-item ${newClass}`;
-      entry.icon.textContent = STATUS_ICON[task.status];
-    }
-
-    this._updateSummary(tasks);
+    this._updateRows();
   }
 }

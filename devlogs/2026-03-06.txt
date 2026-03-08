@@ -1,0 +1,77 @@
+Title: Creatures actually move now
+TL;DR: Fixed completely broken creature pathfinding — specimens now roam the entire facility through doorways and detect the player properly.
+---
+Bug fixes:
+- Escaped specimens were stuck in their room forever — the navigation graph had zero connections between rooms and hallways, so pathfinding always failed silently
+- Hallway ring was broken at corners (overlapping waypoints weren't connected)
+- Specimen detection range wasn't scaling up over time as intended
+- Specimens now path through doorways like the player does — room center → door → hallway → other rooms
+
+Gameplay changes:
+- Specimens pause less between waypoints (0.5-2s instead of 2-4s) so they feel more restless and cover the facility faster
+
+New features:
+- Dev panel (press + key) — skip straight to night with a specimen in containment, or trigger an escape instantly
+
+Chase AI overhaul:
+- Creatures now charge straight at you when close instead of zig-zagging through waypoints — feels way more aggressive
+- No more stuttering at hallway corners — creatures glide through turns smoothly
+- Much harder to shake off: creatures pursue for longer (12s vs 8s) and track your movement better
+- When a creature loses sight of you, it goes to where it last SAW you — not where you actually are. Hiding around a corner actually works now
+
+No more idle creatures during alert/chase:
+- Specimens now walk toward you during the yellow alert phase instead of standing still staring
+- If you duck out of sight during yellow, the specimen investigates where it saw you instead of going back to idle
+- After hitting you, the specimen only pauses for 1 second (was 2) then immediately resumes the chase
+- Investigating specimens now patrol the area instead of standing in one spot for 8 seconds — they check nearby rooms and hallways
+
+Creature speed + door awareness:
+- Chase speed rebalanced — specimens are now between walking and sprinting speed, so you can outrun them but it's tense
+- Specimens now open doors when they walk through them — you'll hear the door slide open as a warning
+- Closed doors block specimen vision — hiding behind a closed door actually works now. Opening a door still makes noise though, so they might investigate
+- Specimens explore the entire facility instead of looping the same hallway — they pick distant destinations and prioritise hallways
+
+Yellow alert feels snappier:
+- Alert-to-chase transition is faster (0.5s instead of 1s)
+- Investigation patrols are shorter — 2 nearby nodes instead of 4, closer radius
+- Less time spent spinning in yellow before either chasing or returning to wander
+
+Death screen:
+- Removed the jumpscare sequence (flash, ASCII close-up, TV static) — death now fades straight to black with a retry screen
+- Retry returns to the main menu instead of restarting the night directly
+
+Main menu:
+- Background now shows the elevator shaft with scrolling bands — same descent illusion as the night intro
+
+Lure system:
+- Lure pickup in storage room is now a visible ASCII billboard sprite instead of an invisible trigger
+- Lure shows as a task marker on the minimap — first shows pickup location, then shows the deposit location in the containment room
+- Carrying the lure shows a green pathfinding line on the minimap guiding you to the target containment room
+
+UI polish:
+- Containment room care buttons (Feed/Water/Play) moved from the glass panel to the wall on the right side of the glass, with green signs labeling each button
+- Cart quest now only highlights the cart itself instead of the entire elevator room floor
+- Specimen care items (drag-and-drop) moved to the top-right corner of the habitat view with a "DRAG TO HABITAT" hint
+
+Charging dock improvements:
+- Charging station now covers the center desk in the command center — much easier to find and interact with
+- Desk glows green (edges + emissive tint) when battery drops below 20%, with distance-based fade
+- Minimap shows escort path to the charging desk at 20% battery instead of waiting until 0%
+
+Quality of life:
+- Minimap escort paths are now yellow/amber instead of green — easier to distinguish from the player triangle and room walls
+- Escort path lines now follow the actual hallway layout — clean right-angle turns through doorways and corridors instead of wobbly waypoint-to-waypoint paths
+- Main menu elevator view now matches the night intro height — no more jarring visual jump when starting a night
+- Doors auto-open when you walk near them (~2.5 units) — no more mashing E at every doorway. They stay open while you're nearby and auto-close after you leave
+- Device no longer traps your cursor — mouse moves freely across the whole screen when the device is open. Click anywhere outside the device to close it
+- WASD no longer moves the player while the device is open (was especially noticeable when playing Snake)
+- Egg display on the device no longer has a stretched look or ugly green grid — eggs now sit cleanly centered on a dark background
+- Device now opens by looking down — tilt your view all the way down and the device pops up naturally, like glancing at a wrist screen. Move your cursor above the device to put it away. Tab still works as a shortcut
+- Camera can't look as far down anymore (capped at ~60°) — looking all the way down is now the device trigger
+- Specimens no longer give up and wander away after hitting you — they recover faster from the attack pause (0.4s vs 1s), knockback is less extreme, and they track you omnidirectionally for 2 seconds after resuming the chase
+
+Night progression:
+- Food, water, and toy placements now carry over between nights — if Nibbles had food in night 1, it's still there in night 2
+- If a specimen is missing an item, a fetch task spawns for it. If multiple specimens need the same item (e.g. both need food), you can deposit it in either room — the escort path guides you to the closer one
+- Broken camera repairs now show as task markers on the minimap, and the camera prop glows green so you can spot it in the room
+- No more clock-out terminal — when your shift ends, the elevator opens and you just walk into it to end the night. Much more natural than finding and pressing E on a terminal

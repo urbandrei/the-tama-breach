@@ -48,6 +48,11 @@ export class TaskTransport extends TaskBase {
     this._glassContainer = null;
     this._wiggleTimer = 0;
     this._targetRoomId = null;
+
+    // Cart cleanup after hatch escape
+    this._cartCleanupPending = false;
+    this._cleanupTamaId = null;
+    this._cleanupTimer = 0;
   }
 
   // --- Preview mode (cart visible at loading dock before task starts) ---
@@ -82,6 +87,33 @@ export class TaskTransport extends TaskBase {
 
   updatePreview(dt) {
     if (!this._previewCart) return;
+
+    // Cart cleanup pending — wait for creature to leave elevator area
+    if (this._cartCleanupPending) {
+      this._cleanupTimer += dt;
+      const cm = this.game.creatureManager;
+      const creature = cm?.creatures.get(this._cleanupTamaId);
+      const cartPos = this._previewCart.position;
+      let shouldCleanup = this._cleanupTimer > 8; // fallback: 8s max
+
+      if (creature?.ai) {
+        const dx = creature.ai.x - cartPos.x;
+        const dz = creature.ai.z - cartPos.z;
+        if (Math.sqrt(dx * dx + dz * dz) > 5) shouldCleanup = true;
+      }
+
+      if (shouldCleanup) {
+        this._cartCleanupPending = false;
+        this._cleanupTamaId = null;
+        this._cleanupTimer = 0;
+        this.resetPreview();
+        // Close elevator doors (delivery mode kept them open)
+        const em = this.game.elevatorManager;
+        if (em) em._deliveryMode = false;
+      }
+      return;
+    }
+
     this._updateEgg(dt);
     if (this._eggSprite) {
       this._eggSprite.update(dt);
@@ -89,12 +121,26 @@ export class TaskTransport extends TaskBase {
 
     // If egg hatches in preview (player never picked it up), escape from cart
     if (this._eggStage >= EGG_STAGE_COUNT - 1 && this._previewCart && this.state === TaskState.PENDING) {
+      const tamaId = this._transportTamaId; // save BEFORE any cleanup
       const cartPos = this._previewCart.position.clone();
+
       this.state = TaskState.FAILED;
       this.removeTrigger();
-      this.resetPreview();
+
+      // Remove egg + glass from cart, but keep cart mesh visible
+      if (this._eggSprite) {
+        this._eggSprite.dispose();
+        this._eggSprite = null;
+      }
+      if (this._glassContainer && this._previewCart) {
+        this._previewCart.remove(this._glassContainer);
+        this._disposeGroup(this._glassContainer);
+        this._glassContainer = null;
+      }
+
+      // Spawn creature at cart position
       this.game.emit('containment:breach', {
-        tamaId: this._transportTamaId,
+        tamaId,
         roomId: null,
         cartEscape: true,
         spawnPos: { x: cartPos.x, z: cartPos.z },
@@ -104,6 +150,11 @@ export class TaskTransport extends TaskBase {
         type: this.type,
         reason: 'cart_hatch',
       });
+
+      // Wait for creature to leave before cleaning up cart
+      this._cartCleanupPending = true;
+      this._cleanupTamaId = tamaId;
+      this._cleanupTimer = 0;
     }
   }
 
@@ -123,6 +174,9 @@ export class TaskTransport extends TaskBase {
     this._transportTamaId = null;
     this._wiggleTimer = 0;
     this._targetRoomId = null;
+    this._cartCleanupPending = false;
+    this._cleanupTamaId = null;
+    this._cleanupTimer = 0;
   }
 
   getTargetInfo() {
@@ -284,6 +338,76 @@ export class TaskTransport extends TaskBase {
   }
 
   // --- Task lifecycle ---
+
+  /** Override: highlight the cart mesh, not the nearest room prop (elevator). */
+  placeTrigger() {
+    if (this._triggerMesh || this._interactableMeshes.length > 0) return;
+
+    const interactData = {
+      promptText: `[E] ${this.title}`,
+      interact: () => this.start(),
+    };
+
+    if (this._previewCart) {
+      this._highlightCart(interactData);
+    } else {
+      // Fallback: invisible trigger box
+      const [x, y, z] = this.triggerPosition;
+      const geo = new THREE.BoxGeometry(2, 2, 2);
+      const mat = new THREE.MeshBasicMaterial({ visible: false });
+      this._triggerMesh = new THREE.Mesh(geo, mat);
+      this._triggerMesh.position.set(x, y, z);
+      this._triggerMesh.userData.interactable = interactData;
+      this.game.scene.add(this._triggerMesh);
+      this.game.player.interaction.addInteractable(this._triggerMesh);
+    }
+  }
+
+  _highlightCart(interactData) {
+    // Green edge highlights on cart meshes
+    this._previewCart.traverse((child) => {
+      if (!child.isMesh || !child.material?.visible) return;
+      if (child.userData.isGlass) return;
+
+      const originalMat = child.material;
+      const cloned = originalMat.clone();
+      this._highlightMeshes.push({ mesh: child, originalMat });
+      child.material = cloned;
+
+      const edgesGeo = new THREE.EdgesGeometry(child.geometry);
+      const edgesMat = new THREE.LineBasicMaterial({
+        color: 0x00ff41,
+        transparent: true,
+        opacity: 0,
+      });
+      const lines = new THREE.LineSegments(edgesGeo, edgesMat);
+      lines.raycast = () => {};
+      child.add(lines);
+      this._highlightEdges.push(lines);
+    });
+
+    // Bounding box for easier raycasting
+    const box = new THREE.Box3().setFromObject(this._previewCart);
+    if (!box.isEmpty()) {
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+      const margin = 0.3;
+      const geo = new THREE.BoxGeometry(
+        size.x + margin * 2, size.y + margin * 2, size.z + margin * 2
+      );
+      const mat = new THREE.MeshBasicMaterial({ visible: false });
+      this._boundingBoxMesh = new THREE.Mesh(geo, mat);
+      this._boundingBoxMesh.position.copy(center);
+      this._boundingBoxMesh.userData.interactable = interactData;
+      this.game.scene.add(this._boundingBoxMesh);
+      this.game.player.interaction.addInteractable(this._boundingBoxMesh);
+      this._interactableMeshes.push(this._boundingBoxMesh);
+    }
+
+    this._propWorldPos = { x: this._previewCart.position.x, z: this._previewCart.position.z };
+  }
 
   // --- Escort interface (for minimap path) ---
 

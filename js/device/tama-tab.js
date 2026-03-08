@@ -1,4 +1,4 @@
-import { PERSONALITIES } from '../tamagotchi/personality.js';
+import { PERSONALITIES, EGG_FRAMES } from '../tamagotchi/personality.js';
 
 const ACTIONS = ['FEED', 'WATER', 'PLAY'];
 const STATIC_CHARS = '\u2591\u2592\u2593\u2588\u2584\u2580\u2590\u258C';
@@ -153,29 +153,42 @@ export class TamaTab {
     infoRow.appendChild(statusEl);
     this._detail.appendChild(infoRow);
 
-    // Action buttons
-    const actions = document.createElement('div');
-    actions.className = 'tama-actions';
+    // Drag-and-drop care items (overlaid on habitat)
+    const items = document.createElement('div');
+    items.className = 'tama-care-items';
     this._actionBtns = {};
+
+    const hint = document.createElement('div');
+    hint.className = 'tama-care-hint';
+    hint.textContent = 'DRAG TO HABITAT';
+    items.appendChild(hint);
+
+    const ITEM_ICONS = { FEED: '\u2584\u2584', WATER: '~~', PLAY: '**' };
 
     for (let i = 0; i < ACTIONS.length; i++) {
       const action = ACTIONS[i];
-      const btn = document.createElement('button');
-      btn.className = 'tama-btn';
-      if (data.cooldowns[action]) btn.classList.add('cooldown');
-      btn.disabled = data.cooldowns[action] || data.status === 'escaped';
-      btn.textContent = `[${i + 1}] ${action}`;
-      btn.addEventListener('click', () => this._doAction(action));
-      actions.appendChild(btn);
-      this._actionBtns[action] = btn;
+      const item = document.createElement('div');
+      item.className = 'tama-care-item';
+      if (data.cooldowns[action]) item.classList.add('cooldown');
+      item.innerHTML = `<span class="care-icon">${ITEM_ICONS[action]}</span><span class="care-label">${action}</span>`;
+      item.dataset.action = action;
+
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (!item.classList.contains('cooldown')) {
+          this._startDrag(action, e);
+        }
+      });
+
+      items.appendChild(item);
+      this._actionBtns[action] = item;
     }
 
-    // Hide controls until tama has hatched
     if (!data.delivered) {
-      actions.style.display = 'none';
+      items.style.display = 'none';
     }
 
-    this._detail.appendChild(actions);
+    this._detail.appendChild(items);
 
     // Initial draw
     this._drawHabitat(data);
@@ -186,6 +199,12 @@ export class TamaTab {
   _drawHabitat(data) {
     const ctx = this._ctx;
     if (!ctx) return;
+
+    // Egg state: show big centered egg, nothing else
+    if (!data.delivered) {
+      this._drawEgg(ctx, data);
+      return;
+    }
 
     // Clear
     ctx.fillStyle = C_BG;
@@ -230,6 +249,29 @@ export class TamaTab {
 
     // Speech bubble
     this._drawSpeechBubble(ctx, data);
+  }
+
+  _drawEgg(ctx, data) {
+    // Clear to dark background
+    ctx.fillStyle = C_BG;
+    ctx.fillRect(0, 0, HABITAT_W, HABITAT_H);
+
+    // Egg sprite — centered on full canvas
+    const stage = Math.max(0, Math.min(data.eggStage >= 0 ? data.eggStage : 0, 2));
+    const egg = EGG_FRAMES[stage];
+    const cx = HABITAT_W / 2;
+    const fontSize = 11;
+    const lineHeight = 13;
+    const totalHeight = egg.length * lineHeight;
+    const startY = (HABITAT_H - totalHeight) / 2 + lineHeight;
+
+    ctx.fillStyle = '#88ccff';
+    ctx.font = `${fontSize}px "Press Start 2P", monospace`;
+    ctx.textAlign = 'center';
+    for (let i = 0; i < egg.length; i++) {
+      ctx.fillText(egg[i], cx, startY + i * lineHeight);
+    }
+    ctx.textAlign = 'left';
   }
 
   _drawFoodBowl(ctx, x, y, hunger) {
@@ -512,21 +554,72 @@ export class TamaTab {
     ctx.fillText('[CAMERA OFFLINE]', HABITAT_W / 2, HABITAT_H / 2);
   }
 
+  _startDrag(action, e) {
+    this._dragging = action;
+
+    // Create ghost element
+    const ghost = document.createElement('div');
+    ghost.className = 'tama-drag-ghost';
+    ghost.textContent = action;
+    ghost.style.left = e.clientX + 'px';
+    ghost.style.top = e.clientY + 'px';
+    document.body.appendChild(ghost);
+    this._dragGhost = ghost;
+
+    this._onDragMove = (ev) => {
+      if (document.pointerLockElement) return;
+      ghost.style.left = (ev.clientX || this._lastDragX) + 'px';
+      ghost.style.top = (ev.clientY || this._lastDragY) + 'px';
+      this._lastDragX = ev.clientX;
+      this._lastDragY = ev.clientY;
+    };
+    this._onDragUp = (ev) => {
+      this._endDrag(ev);
+    };
+    document.addEventListener('mousemove', this._onDragMove);
+    document.addEventListener('mouseup', this._onDragUp);
+  }
+
+  _endDrag(e) {
+    document.removeEventListener('mousemove', this._onDragMove);
+    document.removeEventListener('mouseup', this._onDragUp);
+
+    if (this._dragGhost) {
+      this._dragGhost.remove();
+      this._dragGhost = null;
+    }
+
+    if (!this._dragging) return;
+    const action = this._dragging;
+    this._dragging = null;
+
+    // Check if drop target is the habitat canvas
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    if (target === this._canvas || (target && this._canvas && this._canvas.contains(target))) {
+      this._doAction(action);
+    }
+  }
+
   _doAction(action) {
     const mgr = this.game.tamagotchiManager;
     if (!mgr) return;
 
-    // Check enclosure item requirement
     const itemMap = { FEED: 'food', WATER: 'water', PLAY: 'toy' };
+    const itemLabels = { food: 'FOOD BOWL', water: 'WATER CONTAINER', toy: 'TOY' };
     const tama = mgr.getTama(this._selectedId);
-    if (tama && !tama._enclosureItems[itemMap[action]]) return;
+    if (tama && !tama._enclosureItems[itemMap[action]]) {
+      // Close device and show error
+      this.game.deviceManager._close();
+      const itemName = itemLabels[itemMap[action]];
+      this.game.emit('ui:center-message', { text: `NO ${itemName}! Deliver it first.` });
+      return;
+    }
 
     const success = mgr.careAction(this._selectedId, action);
     if (success) {
       const btn = this._actionBtns[action];
       if (btn) {
         btn.classList.add('cooldown');
-        btn.disabled = true;
       }
     }
   }
@@ -545,6 +638,13 @@ export class TamaTab {
     if (this._hotkeyHandler) {
       document.removeEventListener('keydown', this._hotkeyHandler);
       this._hotkeyHandler = null;
+    }
+    // Cancel any in-progress drag
+    if (this._dragging) {
+      if (this._onDragMove) document.removeEventListener('mousemove', this._onDragMove);
+      if (this._onDragUp) document.removeEventListener('mouseup', this._onDragUp);
+      if (this._dragGhost) { this._dragGhost.remove(); this._dragGhost = null; }
+      this._dragging = null;
     }
   }
 
@@ -603,16 +703,19 @@ export class TamaTab {
     const encItems = tama ? tama._enclosureItems : { food: false, water: false, toy: false };
     const itemMap = { FEED: 'food', WATER: 'water', PLAY: 'toy' };
 
-    // Action button cooldown states
+    // Care item cooldown states
     for (let i = 0; i < ACTIONS.length; i++) {
       const action = ACTIONS[i];
-      const btn = this._actionBtns[action];
-      if (!btn) continue;
+      const el = this._actionBtns[action];
+      if (!el) continue;
       const onCooldown = data.cooldowns[action];
       const noItem = !encItems[itemMap[action]];
-      btn.classList.toggle('cooldown', onCooldown || serverDown || noItem);
-      btn.disabled = onCooldown || serverDown || noItem || data.status === 'escaped';
-      btn.textContent = serverDown ? '[OFFLINE]' : noItem ? `[${i + 1}] ---` : `[${i + 1}] ${action}`;
+      const disabled = onCooldown || serverDown || noItem || data.status === 'escaped';
+      el.classList.toggle('cooldown', disabled);
+      const label = el.querySelector('.care-label');
+      if (label) {
+        label.textContent = serverDown ? 'OFFLINE' : noItem ? '---' : action;
+      }
     }
   }
 }

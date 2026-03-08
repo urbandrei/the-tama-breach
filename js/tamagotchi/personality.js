@@ -117,7 +117,7 @@ export const PERSONALITIES = {
     preferredBonus: 5,
     ai: {
       wanderSpeed: 2.5,
-      chaseSpeed: 4.0,
+      chaseSpeed: 6.0,
       detectionRange: 18,
       detectionAngle: Math.PI,
       soundRange: 20,
@@ -176,7 +176,7 @@ export const PERSONALITIES = {
     preferredBonus: 5,
     ai: {
       wanderSpeed: 3.5,
-      chaseSpeed: 5.5,
+      chaseSpeed: 6.5,
       detectionRange: 10,
       detectionAngle: Math.PI * 0.5,
       soundRange: 10,
@@ -235,7 +235,7 @@ export const PERSONALITIES = {
     preferredBonus: 5,
     ai: {
       wanderSpeed: 4.5,
-      chaseSpeed: 8.0,
+      chaseSpeed: 7.5,
       detectionRange: 6,
       detectionAngle: Math.PI * 0.4,
       soundRange: 6,

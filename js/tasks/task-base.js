@@ -33,6 +33,7 @@ export class TaskBase {
     this._highlightEdges = [];
     this._highlightTimer = 0;
     this._interactableMeshes = [];  // prop meshes registered as interactables
+    this._boundingBoxMesh = null;   // invisible AABB for easier raycasting (A4)
     this._propWorldPos = null;
   }
 
@@ -50,8 +51,13 @@ export class TaskBase {
     const self = this;
     const checkCondition = () => self.shouldShowOnMap();
 
-    // If highlight found prop meshes, use them as interactables directly
-    if (this._highlightMeshes.length > 0) {
+    // Use bounding box mesh as single interactable if available (A4 fix)
+    if (this._boundingBoxMesh) {
+      this._boundingBoxMesh.userData.interactable = interactData;
+      this._boundingBoxMesh.userData._checkCondition = checkCondition;
+      this.game.player.interaction.addInteractable(this._boundingBoxMesh);
+      this._interactableMeshes.push(this._boundingBoxMesh);
+    } else if (this._highlightMeshes.length > 0) {
       for (const entry of this._highlightMeshes) {
         entry.mesh.userData.interactable = interactData;
         entry.mesh.userData._checkCondition = checkCondition;
@@ -75,11 +81,18 @@ export class TaskBase {
     const roomProps = this.game.facility && this.game.facility.roomProps[this.roomId];
     if (!roomProps || roomProps.length === 0) return;
 
-    // Find nearest prop group to trigger position
+    // Find nearest prop group to trigger position, skipping already-claimed groups (A1)
     let nearest = null;
     let nearestDist = Infinity;
     const _pos = new THREE.Vector3();
     for (const group of roomProps) {
+      // Skip groups that already have an interactable child mesh
+      let claimed = false;
+      group.traverse((child) => {
+        if (child.isMesh && child.userData.interactable) claimed = true;
+      });
+      if (claimed) continue;
+
       group.getWorldPosition(_pos);
       const dx = _pos.x - x;
       const dz = _pos.z - z;
@@ -95,6 +108,9 @@ export class TaskBase {
     nearest.getWorldPosition(_pos);
     this._propWorldPos = { x: _pos.x, z: _pos.z };
 
+    // Compute bounding box for the whole prop group
+    const box = new THREE.Box3();
+
     // Clone materials on visible meshes for green glow + add edge lines
     nearest.traverse((child) => {
       if (!child.isMesh) return;
@@ -103,6 +119,14 @@ export class TaskBase {
       const cloned = originalMat.clone();
       this._highlightMeshes.push({ mesh: child, originalMat });
       child.material = cloned;
+
+      // Expand bounding box
+      if (child.geometry) {
+        child.geometry.computeBoundingBox();
+        const childBox = child.geometry.boundingBox.clone();
+        childBox.applyMatrix4(child.matrixWorld);
+        box.union(childBox);
+      }
 
       // Green edge lines on each mesh
       const edgesGeo = new THREE.EdgesGeometry(child.geometry);
@@ -116,6 +140,22 @@ export class TaskBase {
       child.add(lines);
       this._highlightEdges.push(lines);
     });
+
+    // Create invisible bounding-box mesh as raycast target (A4 fix)
+    if (!box.isEmpty()) {
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+      const margin = 0.3;
+      const geo = new THREE.BoxGeometry(
+        size.x + margin * 2, size.y + margin * 2, size.z + margin * 2
+      );
+      const mat = new THREE.MeshBasicMaterial({ visible: false });
+      this._boundingBoxMesh = new THREE.Mesh(geo, mat);
+      this._boundingBoxMesh.position.copy(center);
+      this.game.scene.add(this._boundingBoxMesh);
+    }
   }
 
   _removeHighlight() {
@@ -164,6 +204,15 @@ export class TaskBase {
       this.game.player.interaction.removeInteractable(mesh);
     }
     this._interactableMeshes = [];
+
+    // Remove bounding box mesh (A4)
+    if (this._boundingBoxMesh) {
+      this.game.player.interaction.removeInteractable(this._boundingBoxMesh);
+      this.game.scene.remove(this._boundingBoxMesh);
+      this._boundingBoxMesh.geometry.dispose();
+      this._boundingBoxMesh.material.dispose();
+      this._boundingBoxMesh = null;
+    }
 
     // Remove fallback invisible trigger
     if (this._triggerMesh) {
@@ -218,6 +267,14 @@ export class TaskBase {
 
   update(_dt) {
     // Override in subclasses
+  }
+
+  /** Priority for sorting (lower = higher priority). */
+  getPriority() {
+    if (this.id === 'transport_specimen' || this.id.startsWith('repair_')) return 1;
+    if (this.id.startsWith('fetch_')) return 2;
+    if (this.id.startsWith('infra_repair_')) return 3;
+    return 5; // routine tasks
   }
 
   shouldShowOnMap() {
